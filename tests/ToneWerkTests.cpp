@@ -148,6 +148,40 @@ TEST_CASE ("The effect chain changes the sound and stays bounded", "[audio][fx]"
     CHECK (wet.first < 1.0);
 }
 
+TEST_CASE ("The reverb lengthens the release", "[audio][reverb]")
+{
+    // energy from 0.2 to 1.2 s after the note-off, with the reverb off and on
+    auto tail = [] (bool reverb) {
+        PluginProcessor plugin;
+        plugin.setRateAndBufferSizeDetails (48000.0, 512);
+        plugin.prepareToPlay (48000.0, 512);
+        REQUIRE (waitForInstrument (plugin, 512));
+        setParam (plugin, tw::ids::reverbOn, reverb ? 1.0f : 0.0f);
+        setParam (plugin, tw::ids::reverbDecay, 3.0f);
+        juce::AudioBuffer<float> buffer (2, 512);
+        double energy = 0.0;
+        for (int b = 0; b < int (2.0 * 48000.0 / 512); ++b)
+        {
+            juce::MidiBuffer midi;
+            if (b == 0)
+                midi.addEvent (juce::MidiMessage::noteOn (1, 60, (juce::uint8) 100), 0);
+            if (b == int (0.3 * 48000.0 / 512))
+                midi.addEvent (juce::MidiMessage::noteOff (1, 60), 0);
+            buffer.clear();
+            plugin.processBlock (buffer, midi);
+            const double t = double (b) * 512.0 / 48000.0 - 0.3;
+            if (t >= 0.2 && t < 1.2)
+                for (int ch = 0; ch < 2; ++ch)
+                    for (int i = 0; i < 512; ++i)
+                        energy += double (buffer.getSample (ch, i)) * buffer.getSample (ch, i);
+        }
+        return energy;
+    };
+    const double dry = tail (false), wet = tail (true);
+    WARN ("release tail: reverb off " << 10.0 * std::log10 (dry + 1e-30) << " dB, on " << 10.0 * std::log10 (wet + 1e-30) << " dB");
+    CHECK (wet > 2.0 * dry);
+}
+
 TEST_CASE ("User presets round-trip", "[presets]")
 {
     PluginProcessor plugin;

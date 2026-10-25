@@ -1,6 +1,6 @@
 # ToneWerk
 
-![ToneWerk: preset bar, instrument and voicing, the MK8 effect chain, the keyboard E1–E7](docs/images/tonewerk.png)
+![ToneWerk: preset bar, instrument and voicing, the MK8 effect chain and reverb, the keyboard E1–E7](docs/images/tonewerk.png)
 
 The hybrid instruments of [pmpiano](https://github.com/Michi71/pmpiano) as a plugin and standalone app: Rhodes Mark I/II,
 Suitcase, MK8 (physical model), Wurlitzer 200A, Clavinet D6, Pianet T, the grands (SGP, Steinway, Grandpa's) and the Yamaha
@@ -63,6 +63,9 @@ CP80 have none and stay silent. The status line below the instrument choice tell
   rebuilds the instrument (after 250 ms without further changes); sounding notes stop.
 - **Effects**: the MK8 chain in the units of the Rhodes V8 Pro – preamp (drive, envelope, level), equalizer, Vari-Pan,
   compressor, chorus, phaser, delay. The **FX** switch bypasses the whole chain.
+- **Reverb** at the end, on its own switch (independent of **FX**, so the grands get a room without the MK8 preamp): mix, size,
+  decay (RT60 0.3–10 s), damping (how much faster the highs die away), pre-delay (0–200 ms), width. The grand presets have it on;
+  Steinway and Grandpa's with less, their recordings carry some room already.
 - **Presets**: factory and user presets in one list; **Save** stores the current settings as
   `~/Documents/ToneWerk/Presets/<name>.twpreset` (XML), **Delete** moves a user preset to the trash, `<`/`>` step through the list.
   The host saves the state, including the preset name, with the project.
@@ -81,6 +84,11 @@ CP80 have none and stay silent. The status line below the instrument choice tell
   audio thread adopts them, fades the old one out and hands it back for deletion. Nothing is allocated or freed on the audio thread.
 - The effect chain (`pmp::Mk8Effects`) runs in the plugin at the host rate; the engine itself runs with `fx.on=0` and without
   its soft clip.
+- The reverb (`source/Reverb.*`) is a feedback delay network: pre-delay, early reflections, four allpass diffusers per channel,
+  eight delay lines mixed by a Hadamard matrix, each with a one-pole absorption filter set from the RT60 at low frequencies and
+  at Nyquist. Slow modulation of the line lengths (read through a first-order allpass, which keeps the RT60 exact) prevents
+  metallic ringing. Measured in `tests/ReverbTests.cpp`: RT60 within 8 % of the setting for every size, stable at the extremes,
+  bit-transparent at mix 0; about 0.3 % of one core.
 - The engine is built without fast math (its own target `pmpcore`); the template's default `-Ofast` is deliberately not used.
 
 ## CI

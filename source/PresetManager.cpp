@@ -36,9 +36,13 @@ namespace
             { "Clavinet Funk", "clav6", { { ids::fxOn, 1 }, { ids::panOn, 0 }, { ids::delayOn, 0 }, { ids::fxDrive, 40 },
                                             { ids::compAmount, 60 }, { ids::fxMid, 4 }, { ids::fxMidFreq, 1200 } } },
             { "Pianet T", "pianet", {} },
-            { "Grand Piano", "grand", {} },
-            { "Steinway Grand", "steinway", {} },
-            { "Grandpa's Grand", "grandpas", {} },
+            // the grands in a hall; the Steinway and Grandpa's recordings carry some room already: less of it
+            { "Grand Piano", "grand", { { ids::reverbOn, 1 }, { ids::reverbMix, 28 }, { ids::reverbSize, 65 },
+                                          { ids::reverbDecay, 2.4f }, { ids::reverbDamping, 45 }, { ids::reverbPredelay, 22 } } },
+            { "Steinway Grand", "steinway", { { ids::reverbOn, 1 }, { ids::reverbMix, 18 }, { ids::reverbSize, 60 },
+                                                { ids::reverbDecay, 2.0f }, { ids::reverbDamping, 50 }, { ids::reverbPredelay, 18 } } },
+            { "Grandpa's Grand", "grandpas", { { ids::reverbOn, 1 }, { ids::reverbMix, 15 }, { ids::reverbSize, 45 },
+                                                 { ids::reverbDecay, 1.6f }, { ids::reverbDamping, 55 }, { ids::reverbPredelay, 12 } } },
             { "CP80 Chorus", "cp80", { { ids::fxOn, 1 }, { ids::panOn, 0 }, { ids::chorusOn, 1 }, { ids::chorusRate, 1.2f },
                                          { ids::chorusDepth, 2.5f }, { ids::delayMix, 20 } } },
         };

@@ -245,6 +245,13 @@ PluginEditor::PluginEditor (PluginProcessor& p)
     delay->add (knob (ids::delayFeedback, "Feedback"));
     delay->add (knob (ids::delayMix, "Mix"));
     delay->add (std::make_unique<Switch> (state, ids::delayPingPong, "Ping-Pong"));
+    auto* reverb = section ("Reverb", ids::reverbOn); // after the chain, not under the FX switch
+    reverb->add (knob (ids::reverbMix, "Mix"));
+    reverb->add (knob (ids::reverbSize, "Size"));
+    reverb->add (knob (ids::reverbDecay, "Decay"));
+    reverb->add (knob (ids::reverbDamping, "Damping"));
+    reverb->add (knob (ids::reverbPredelay, "Pre-Delay"));
+    reverb->add (knob (ids::reverbWidth, "Width"));
 
     // keyboard: the 73 keys of the engine
     keyboard_.setAvailableRange (pmp::kFirstKey, pmp::kLastKey);
@@ -359,7 +366,7 @@ void PluginEditor::resized()
     auto fxHead = fp.removeFromTop (36);
     fxOn_.setBounds (fxHead.removeFromRight (70).withSizeKeepingCentre (70, 24));
     fp.removeFromBottom (12);
-    const std::vector<std::vector<int>> rows { { 0, 1 }, { 2, 3, 4 }, { 5, 6 } };
+    const std::vector<std::vector<int>> rows { { 0, 1 }, { 2, 3, 4, 5 }, { 6, 7 } };
     const int gap = 8;
     const int h = (fp.getHeight() - gap * int (rows.size() - 1)) / int (rows.size());
     for (const auto& row : rows)
@@ -384,8 +391,8 @@ void PluginEditor::timerCallback()
 {
     status_.setText (processor_.instrumentStatus(), juce::dontSendNotification);
     const bool fx = fxOn_.getToggleState();
-    for (auto& s : fxSections_)
-        s->setAlpha (fx ? 1.0f : 0.45f);
+    for (size_t i = 0; i < fxSections_.size(); ++i)
+        fxSections_[i]->setAlpha (fx || i == kReverbSection ? 1.0f : 0.45f);
 
     auto& presets = processor_.presets();
     if (presets.currentName() != shownPreset_ || presets.currentIsFactory() != shownFactory_)

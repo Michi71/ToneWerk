@@ -33,6 +33,8 @@ PluginProcessor::PluginProcessor()
         raw (ids::compOn), raw (ids::compAmount), raw (ids::compMakeup), raw (ids::chorusOn), raw (ids::chorusRate),
         raw (ids::chorusDepth), raw (ids::phaserOn), raw (ids::phaserRate), raw (ids::phaserDepth), raw (ids::delayOn),
         raw (ids::delayTime), raw (ids::delayFeedback), raw (ids::delayMix), raw (ids::delayPingPong) };
+    rvp_ = { raw (ids::reverbOn), raw (ids::reverbMix), raw (ids::reverbSize), raw (ids::reverbDecay), raw (ids::reverbDamping),
+        raw (ids::reverbPredelay), raw (ids::reverbWidth) };
 
     // a fresh instance is the first factory preset (the parameter defaults)
     apvts_.state.setProperty (tw::PresetManager::kNameProperty, presets_.factoryNames()[0], nullptr);
@@ -42,6 +44,7 @@ PluginProcessor::PluginProcessor()
     fx_.setDelayTime (4.0);
     fx_.init (48000.0);
     scratch_.setSize (3, kChunk);
+    reverb_.prepare (48000.0);
     startThread (juce::Thread::Priority::normal);
 }
 
@@ -158,6 +161,8 @@ void PluginProcessor::prepareToPlay (double sampleRate, int)
     fx_.setDelayTime (4.0);
     fx_.init (sampleRate);
     fxWasOn_ = false;
+    reverb_.prepare (sampleRate);
+    reverbWasOn_ = false;
     gain_.reset (sampleRate, 0.02);
     gain_.setCurrentAndTargetValue (juce::Decibels::decibelsToGain (volume_->load(), -48.0f));
     fadeStep_ = float (1.0 / (kFadeMs * 1e-3 * sampleRate));
@@ -313,6 +318,37 @@ void PluginProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::Midi
             fx_.process (left + done, right + done, juce::jmin (kChunk, n - done));
     }
     fxWasOn_ = fxOn;
+
+    // the reverb after the effect chain, on its own switch (the grands want it without the MK8 preamp)
+    const bool reverbOn = rvp_.on->load() > 0.5f;
+    if (reverbOn)
+    {
+        if (!reverbWasOn_)
+            reverb_.reset();
+        tw::Reverb::Settings rs;
+        rs.mix = rvp_.mix->load() * 0.01f;
+        rs.size = rvp_.size->load() * 0.01f;
+        rs.decay = rvp_.decay->load();
+        rs.damping = rvp_.damping->load() * 0.01f;
+        rs.predelayMs = rvp_.predelay->load();
+        rs.width = rvp_.width->load() * 0.01f;
+        reverb_.setSettings (rs);
+        for (int done = 0; done < n; done += kChunk)
+        {
+            const int m = juce::jmin (kChunk, n - done);
+            if (mono)
+            {
+                float* r = scratch_.getWritePointer (2);
+                juce::FloatVectorOperations::copy (r, left + done, m);
+                reverb_.process (left + done, r, m);
+                for (int i = 0; i < m; ++i)
+                    left[done + i] = 0.5f * (left[done + i] + r[i]);
+            }
+            else
+                reverb_.process (left + done, right + done, m);
+        }
+    }
+    reverbWasOn_ = reverbOn;
 
     gain_.setTargetValue (juce::Decibels::decibelsToGain (volume_->load(), -48.0f));
     for (int ch = 0; ch < juce::jmin (2, buffer.getNumChannels()); ++ch)

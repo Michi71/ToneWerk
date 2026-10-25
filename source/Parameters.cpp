@@ -99,6 +99,16 @@ Layout createParameterLayout()
     fx->addChild (toggle (ids::delayPingPong, "Delay Ping-Pong", d.fxDelayPingPong > 0.5f));
     layout.add (std::move (fx));
 
+    auto reverb = std::make_unique<juce::AudioProcessorParameterGroup> ("reverb", "Reverb", "|");
+    reverb->addChild (toggle (ids::reverbOn, "Reverb On", false));
+    reverb->addChild (number (ids::reverbMix, "Reverb Mix", { 0.0f, 100.0f, 0.1f }, 25.0f, "%", 0));
+    reverb->addChild (number (ids::reverbSize, "Reverb Size", { 0.0f, 100.0f, 0.1f }, 50.0f, "%", 0));
+    reverb->addChild (number (ids::reverbDecay, "Reverb Decay", skewed (0.3f, 10.0f, 2.0f), 2.0f, "s", 2));
+    reverb->addChild (number (ids::reverbDamping, "Reverb Damping", { 0.0f, 100.0f, 0.1f }, 50.0f, "%", 0));
+    reverb->addChild (number (ids::reverbPredelay, "Reverb Pre-Delay", { 0.0f, 200.0f, 0.1f }, 20.0f, "ms", 0));
+    reverb->addChild (number (ids::reverbWidth, "Reverb Width", { 0.0f, 100.0f, 0.1f }, 100.0f, "%", 0));
+    layout.add (std::move (reverb));
+
     return layout;
 }
 
@@ -109,7 +119,8 @@ const juce::StringArray& allParameterIds()
         ids::fxOn, ids::fxVolume, ids::fxDrive, ids::fxEnvelope, ids::fxBass, ids::fxMid, ids::fxMidFreq, ids::fxTreble,
         ids::panOn, ids::panWave, ids::panRate, ids::panDepth, ids::compOn, ids::compAmount, ids::compMakeup,
         ids::chorusOn, ids::chorusRate, ids::chorusDepth, ids::phaserOn, ids::phaserRate, ids::phaserDepth,
-        ids::delayOn, ids::delayTime, ids::delayFeedback, ids::delayMix, ids::delayPingPong
+        ids::delayOn, ids::delayTime, ids::delayFeedback, ids::delayMix, ids::delayPingPong,
+        ids::reverbOn, ids::reverbMix, ids::reverbSize, ids::reverbDecay, ids::reverbDamping, ids::reverbPredelay, ids::reverbWidth
     };
     return all;
 }

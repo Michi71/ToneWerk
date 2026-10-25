@@ -44,6 +44,14 @@ namespace ids
     inline constexpr const char* delayFeedback = "delay_feedback";
     inline constexpr const char* delayMix = "delay_mix";
     inline constexpr const char* delayPingPong = "delay_pingpong";
+    // the FDN reverb at the end of the chain (Reverb.h), independent of the FX switch
+    inline constexpr const char* reverbOn = "reverb_on";
+    inline constexpr const char* reverbMix = "reverb_mix";
+    inline constexpr const char* reverbSize = "reverb_size";
+    inline constexpr const char* reverbDecay = "reverb_decay";
+    inline constexpr const char* reverbDamping = "reverb_damping";
+    inline constexpr const char* reverbPredelay = "reverb_predelay";
+    inline constexpr const char* reverbWidth = "reverb_width";
 } // namespace ids
 
 // the instruments are the presets of the engine (pmp::Params::presetId)
