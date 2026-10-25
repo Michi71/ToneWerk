@@ -59,27 +59,27 @@ InstrumentVoice::InstrumentVoice (const VoiceConfig& config, std::shared_ptr<Ban
     engine_ = std::make_unique<pmp::Engine> (p);
     std::string err;
     if (hasBank && !engine_->setHybridBank (bank_->data, bank_->size, &err, slot))
-        status_ = "Bank defekt (" + juce::String (err) + ")";
+        status_ = "Bank damaged (" + juce::String (err) + ")";
     const int bankRate = hasBank ? engine_->hybridBankRate (slot) : 0;
     engineRate_ = bankRate > 0 ? double (bankRate) : 48000.0;
     engine_->setSampleRate (engineRate_);
 
     const auto dot = juce::String::fromUTF8 (" \xc2\xb7 ");
-    const auto rate = juce::String (engineRate_ / 1000.0, 1).replaceCharacter ('.', ',') + " kHz";
+    const auto rate = juce::String (engineRate_ / 1000.0, 1) + " kHz";
     switch (engine_->hybridState())
     {
         case pmp::Engine::HybridState::Active:
             status_ = "Hybrid" + dot + bank_->file.getFileName() + dot + rate;
             break;
         case pmp::Engine::HybridState::Off:
-            status_ = wantsBank ? "Bank " + bankFileName (slot) + " fehlt" + dot + "physikalisches Modell" + dot + rate
-                                : "Physikalisches Modell" + dot + rate;
+            status_ = wantsBank ? "Bank " + bankFileName (slot) + " missing" + dot + "physical model" + dot + rate
+                                : "Physical model" + dot + rate;
             break;
         case pmp::Engine::HybridState::NoBank:
         case pmp::Engine::HybridState::RateMismatch:
             silent_ = true;
             if (status_.isEmpty())
-                status_ = "Bank " + bankFileName (slot) + " fehlt" + dot + "stumm";
+                status_ = "Bank " + bankFileName (slot) + " missing" + dot + "silent";
             break;
     }
 }
