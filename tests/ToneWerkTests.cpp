@@ -182,6 +182,52 @@ TEST_CASE ("The reverb lengthens the release", "[audio][reverb]")
     CHECK (wet > 2.0 * dry);
 }
 
+// A switch flipped while a chord sounds: the largest sample-to-sample step within 5 ms of the switch against the largest one in the
+// half second before it. A hard cut between the dry and the processed signal shows up as a step far above the signal's own.
+static double switchClick (const char* switchId, bool on)
+{
+    PluginProcessor plugin;
+    constexpr double rate = 48000.0;
+    constexpr int block = 256;
+    plugin.setRateAndBufferSizeDetails (rate, block);
+    plugin.prepareToPlay (rate, block);
+    REQUIRE (waitForInstrument (plugin, block));
+    setParam (plugin, switchId, on ? 0.0f : 1.0f);
+    juce::AudioBuffer<float> buffer (2, block);
+    std::vector<float> outL;
+    const int switchBlock = int (1.0 * rate / block);
+    for (int b = 0; b < switchBlock + int (0.2 * rate / block); ++b)
+    {
+        juce::MidiBuffer midi;
+        if (b == 0)
+            for (const int note : { 48, 55, 60, 64 })
+                midi.addEvent (juce::MidiMessage::noteOn (1, note, (juce::uint8) 110), 0);
+        if (b == switchBlock)
+            setParam (plugin, switchId, on ? 1.0f : 0.0f);
+        buffer.clear();
+        plugin.processBlock (buffer, midi);
+        outL.insert (outL.end(), buffer.getReadPointer (0), buffer.getReadPointer (0) + block);
+    }
+    const size_t at = size_t (switchBlock * block), win = size_t (0.005 * rate);
+    double before = 0.0, around = 0.0;
+    for (size_t i = at - size_t (0.5 * rate); i < at; ++i)
+        before = std::max (before, double (std::abs (outL[i] - outL[i - 1])));
+    for (size_t i = at; i < at + win; ++i)
+        around = std::max (around, double (std::abs (outL[i] - outL[i - 1])));
+    return around / before;
+}
+
+TEST_CASE ("Switching the effects while playing does not click", "[audio][fx]")
+{
+    for (const char* id : { tw::ids::fxOn, tw::ids::reverbOn })
+        for (const bool on : { true, false })
+        {
+            const double ratio = switchClick (id, on);
+            WARN (id << (on ? " on" : " off") << ": largest step at the switch / before = " << ratio);
+            CHECK (ratio < 1.5);
+        }
+}
+
 TEST_CASE ("User presets round-trip", "[presets]")
 {
     PluginProcessor plugin;
@@ -304,4 +350,84 @@ TEST_CASE ("Note onset latency", "[.latency]")
                   << " ms, peak at " << juce::String (1000.0 * double (peakAt) / rate, 2) << " ms");
         }
     }
+}
+
+// every instrument at the voicing extremes: level, peak and brightness against neutral (hidden: ./Tests "[.voicing]")
+TEST_CASE ("Voicing extremes per instrument", "[.voicing]")
+{
+    if (!banksAvailable())
+        SKIP ("no banks found");
+    struct Setting
+    {
+        const char* id;
+        float value;
+    };
+    const std::vector<std::vector<Setting>> settings {
+        {}, { { tw::ids::hardness, -200 } }, { { tw::ids::hardness, 200 } }, { { tw::ids::decay, -90 } }, { { tw::ids::decay, 300 } },
+        { { tw::ids::unison, -100 } }, { { tw::ids::unison, 200 } }, { { tw::ids::stretch, -20 } }, { { tw::ids::stretch, 20 } }
+    };
+    PluginProcessor plugin;
+    plugin.setRateAndBufferSizeDetails (48000.0, 512);
+    plugin.prepareToPlay (48000.0, 512);
+    for (int i = 0; i < pmp::Params::presetCount(); ++i)
+    {
+        double rms0 = 0.0, bright0 = 0.0;
+        for (const auto& set : settings)
+        {
+            for (const char* id : { tw::ids::hardness, tw::ids::decay, tw::ids::unison, tw::ids::stretch })
+                setParam (plugin, id, 0.0f);
+            setParam (plugin, tw::ids::instrument, float (i));
+            for (const auto& s : set)
+                setParam (plugin, s.id, s.value);
+            REQUIRE (waitForInstrument (plugin, 512));
+            juce::AudioBuffer<float> buffer (2, 512);
+            double sum = 0.0, diff = 0.0, peak = 0.0;
+            float last = 0.0f;
+            for (int b = 0; b < int (1.0 * 48000.0 / 512); ++b)
+            {
+                juce::MidiBuffer midi;
+                if (b == 0)
+                    for (const int note : { 40, 52, 64, 76 })
+                        midi.addEvent (juce::MidiMessage::noteOn (1, note, (juce::uint8) 100), 0);
+                buffer.clear();
+                plugin.processBlock (buffer, midi);
+                for (int k = 0; k < 512; ++k)
+                {
+                    const float x = buffer.getSample (0, k);
+                    sum += double (x) * x;
+                    diff += double (x - last) * (x - last); // first difference: a crude brightness measure
+                    peak = std::max (peak, double (std::abs (x)));
+                    last = x;
+                }
+            }
+            const double rms = std::sqrt (sum / 48000.0), bright = std::sqrt (diff / std::max (sum, 1e-30));
+            if (set.empty())
+                rms0 = rms, bright0 = bright;
+            WARN (juce::String (pmp::Params::presetId (i)).paddedRight (' ', 10)
+                  << (set.empty() ? juce::String ("neutral") : juce::String (set[0].id) + "=" + juce::String (set[0].value)).paddedRight (' ', 24)
+                  << " level " << juce::String (20.0 * std::log10 (rms / rms0), 1) << " dB, peak " << juce::String (peak, 3)
+                  << ", brightness " << juce::String (20.0 * std::log10 (bright / bright0), 1) << " dB"
+                  << (std::isfinite (rms) ? "" : "  NOT FINITE"));
+        }
+    }
+}
+
+TEST_CASE ("The voicing reset button sets the voicing back to neutral", "[editor]")
+{
+    PluginProcessor plugin;
+    for (const char* id : { tw::ids::hardness, tw::ids::decay, tw::ids::unison, tw::ids::stretch })
+        setParam (plugin, id, std::string (id) == tw::ids::stretch ? 10.0f : 50.0f);
+    std::unique_ptr<juce::AudioProcessorEditor> editor (plugin.createEditorAndMakeActive());
+    juce::TextButton* reset = nullptr;
+    for (auto* c : editor->getChildren())
+        if (auto* b = dynamic_cast<juce::TextButton*> (c); b != nullptr && b->getButtonText() == "Reset")
+            reset = b;
+    REQUIRE (reset != nullptr);
+    CHECK (reset->isEnabled());
+    reset->triggerClick();
+    juce::MessageManager::getInstance()->runDispatchLoopUntil (50); // triggerClick is asynchronous
+    for (const char* id : { tw::ids::hardness, tw::ids::decay, tw::ids::unison, tw::ids::stretch })
+        CHECK (std::abs (plugin.state().getRawParameterValue (id)->load()) < 1e-4f);
+    CHECK (!reset->isEnabled());
+    plugin.editorBeingDeleted (editor.get());
 }

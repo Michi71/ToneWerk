@@ -43,7 +43,7 @@ PluginProcessor::PluginProcessor()
     // the delay lines are allocated for the longest time once
     fx_.setDelayTime (4.0);
     fx_.init (48000.0);
-    scratch_.setSize (3, kChunk);
+    scratch_.setSize (5, kChunk);
     reverb_.prepare (48000.0);
     startThread (juce::Thread::Priority::normal);
 }
@@ -160,9 +160,10 @@ void PluginProcessor::prepareToPlay (double sampleRate, int)
     hostRate_.store (sampleRate);
     fx_.setDelayTime (4.0);
     fx_.init (sampleRate);
-    fxWasOn_ = false;
+    fxGain_ = 0.0f;
     reverb_.prepare (sampleRate);
-    reverbWasOn_ = false;
+    reverbGain_ = 0.0f;
+    switchStep_ = float (1.0 / (kSwitchMs * 1e-3 * sampleRate));
     gain_.reset (sampleRate, 0.02);
     gain_.setCurrentAndTargetValue (juce::Decibels::decibelsToGain (volume_->load(), -48.0f));
     fadeStep_ = float (1.0 / (kFadeMs * 1e-3 * sampleRate));
@@ -307,24 +308,15 @@ void PluginProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::Midi
     for (; it != midi.end(); ++it)
         handleMidi ((*it).getMessage());
 
-    // the MK8 effect chain at the host rate (stereo only)
-    const bool fxOn = fxp_.on->load() > 0.5f && buffer.getNumChannels() > 1;
-    if (fxOn)
-    {
-        if (!fxWasOn_)
-            fx_.reset();
-        updateEffects();
-        for (int done = 0; done < n; done += kChunk)
-            fx_.process (left + done, right + done, juce::jmin (kChunk, n - done));
-    }
-    fxWasOn_ = fxOn;
-
-    // the reverb after the effect chain, on its own switch (the grands want it without the MK8 preamp)
+    // the MK8 effect chain (stereo only), then the reverb on its own switch (the grands want it without the MK8 preamp), both at
+    // the host rate. A switch cross-fades the stage in or out over kSwitchMs: the hard switch clicked (measured: the largest
+    // step 4.7 times the chord's own when the chain came in)
+    const bool fxOn = fxp_.on->load() > 0.5f && !mono;
     const bool reverbOn = rvp_.on->load() > 0.5f;
-    if (reverbOn)
+    if (fxOn || fxGain_ > 0.0f)
+        updateEffects();
+    if (reverbOn || reverbGain_ > 0.0f)
     {
-        if (!reverbWasOn_)
-            reverb_.reset();
         tw::Reverb::Settings rs;
         rs.mix = rvp_.mix->load() * 0.01f;
         rs.size = rvp_.size->load() * 0.01f;
@@ -333,22 +325,44 @@ void PluginProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::Midi
         rs.predelayMs = rvp_.predelay->load();
         rs.width = rvp_.width->load() * 0.01f;
         reverb_.setSettings (rs);
-        for (int done = 0; done < n; done += kChunk)
-        {
-            const int m = juce::jmin (kChunk, n - done);
-            if (mono)
-            {
-                float* r = scratch_.getWritePointer (2);
-                juce::FloatVectorOperations::copy (r, left + done, m);
-                reverb_.process (left + done, r, m);
-                for (int i = 0; i < m; ++i)
-                    left[done + i] = 0.5f * (left[done + i] + r[i]);
-            }
-            else
-                reverb_.process (left + done, right + done, m);
-        }
     }
-    reverbWasOn_ = reverbOn;
+    auto stage = [this] (float* l, float* r, int m, float& gain, bool on, auto&& process, auto&& restart) {
+        if (!on && gain <= 0.0f)
+            return;
+        if (on && gain <= 0.0f)
+            restart(); // from the bypass: no stale state
+        if (on && gain >= 1.0f)
+        {
+            process (l, r, m);
+            return;
+        }
+        float* wl = scratch_.getWritePointer (3);
+        float* wr = scratch_.getWritePointer (4);
+        juce::FloatVectorOperations::copy (wl, l, m);
+        juce::FloatVectorOperations::copy (wr, r, m);
+        process (wl, wr, m);
+        const float target = on ? 1.0f : 0.0f;
+        for (int i = 0; i < m; ++i)
+        {
+            gain = on ? juce::jmin (target, gain + switchStep_) : juce::jmax (target, gain - switchStep_);
+            l[i] += gain * (wl[i] - l[i]);
+            r[i] += gain * (wr[i] - r[i]);
+        }
+    };
+    for (int done = 0; done < n; done += kChunk)
+    {
+        const int m = juce::jmin (kChunk, n - done);
+        float* l = left + done;
+        float* r = mono ? scratch_.getWritePointer (2) : right + done;
+        if (mono)
+            juce::FloatVectorOperations::copy (r, l, m);
+        stage (l, r, m, fxGain_, fxOn, [this] (float* a, float* b, int k) { fx_.process (a, b, k); }, [this] { fx_.reset(); });
+        stage (l, r, m, reverbGain_, reverbOn, [this] (float* a, float* b, int k) { reverb_.process (a, b, k); },
+            [this] { reverb_.reset(); });
+        if (mono)
+            for (int i = 0; i < m; ++i)
+                l[i] = 0.5f * (l[i] + r[i]);
+    }
 
     gain_.setTargetValue (juce::Decibels::decibelsToGain (volume_->load(), -48.0f));
     for (int ch = 0; ch < juce::jmin (2, buffer.getNumChannels()); ++ch)

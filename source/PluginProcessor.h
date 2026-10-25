@@ -63,7 +63,8 @@ public:
 
 private:
     static constexpr int kChunk = 512;      // largest render call into a voice [host frames]
-    static constexpr double kFadeMs = 30.0; // fade-out of the old voice after a switch
+    static constexpr double kFadeMs = 30.0;   // fade-out of the old voice after a switch
+    static constexpr double kSwitchMs = 20.0; // cross-fade of the FX and reverb switches
 
     void run() override; // the loader thread
     tw::VoiceConfig wantedConfig() const;
@@ -118,11 +119,10 @@ private:
     float fadeGain_ = 0.0f, fadeStep_ = 0.0f;
     int sustain_ = 0;
     pmp::Mk8Effects fx_;
-    bool fxWasOn_ = false;
     tw::Reverb reverb_;
-    bool reverbWasOn_ = false;
+    float fxGain_ = 0.0f, reverbGain_ = 0.0f, switchStep_ = 0.001f; // cross-fades of the stage switches
     juce::SmoothedValue<float> gain_ { 1.0f };
-    juce::AudioBuffer<float> scratch_; // fading voice (2 channels) and the right channel of a mono output
+    juce::AudioBuffer<float> scratch_; // fading voice (0, 1), right channel of a mono output (2), a stage fading in or out (3, 4)
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (PluginProcessor)
 };

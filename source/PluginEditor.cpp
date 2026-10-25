@@ -206,6 +206,9 @@ PluginEditor::PluginEditor (PluginProcessor& p)
     stretch_ = std::make_unique<tw::Knob> (state, ids::stretch, "Stretch");
     for (auto* k : { volume_.get(), hardness_.get(), decay_.get(), unison_.get(), stretch_.get() })
         addAndMakeVisible (*k);
+    resetVoicing_.setTooltip ("Reset the voicing to the instrument as calibrated (all controls 0)");
+    resetVoicing_.onClick = [this] { resetVoicing(); };
+    addAndMakeVisible (resetVoicing_);
 
     // effects
     fxOn_.setButtonText ("FX");
@@ -354,6 +357,7 @@ void PluginEditor::resized()
     volume_->setBounds (vol.withSizeKeepingCentre (juce::jmin (120, vol.getWidth()), vol.getHeight()));
     ip.removeFromTop (8);
     voicingTitle_ = ip.removeFromTop (26);
+    resetVoicing_.setBounds (voicingTitle_.withLeft (voicingTitle_.getRight() - 58).reduced (0, 3));
     const int rowH = ip.getHeight() / 2;
     auto row1 = ip.removeFromTop (rowH), row2 = ip;
     hardness_->setBounds (row1.removeFromLeft (row1.getWidth() / 2));
@@ -390,6 +394,7 @@ void PluginEditor::resized()
 void PluginEditor::timerCallback()
 {
     status_.setText (processor_.instrumentStatus(), juce::dontSendNotification);
+    resetVoicing_.setEnabled (!voicingIsNeutral());
     const bool fx = fxOn_.getToggleState();
     for (size_t i = 0; i < fxSections_.size(); ++i)
         fxSections_[i]->setAlpha (fx || i == kReverbSection ? 1.0f : 0.45f);
@@ -479,6 +484,32 @@ void PluginEditor::deletePreset()
             processor_.presets().remove (name);
             refreshPresetList();
         });
+}
+
+namespace
+{
+const char* const kVoicingIds[] = { ids::hardness, ids::decay, ids::unison, ids::stretch };
+}
+
+bool PluginEditor::voicingIsNeutral() const
+{
+    for (const char* id : kVoicingIds)
+        if (const auto* p = processor_.state().getParameter (id); p != nullptr && std::abs (p->getValue() - p->getDefaultValue()) > 1e-6f)
+            return false;
+    return true;
+}
+
+// every voicing control back to its default in one go: one rebuild of the instrument (the loader waits for the controls to rest)
+void PluginEditor::resetVoicing()
+{
+    for (const char* id : kVoicingIds)
+        if (auto* p = processor_.state().getParameter (id))
+        {
+            p->beginChangeGesture();
+            p->setValueNotifyingHost (p->getDefaultValue());
+            p->endChangeGesture();
+        }
+    resetVoicing_.setEnabled (false);
 }
 
 void PluginEditor::showBankMenu()
