@@ -1,5 +1,7 @@
 # ToneWerk
 
+![ToneWerk: preset bar, instrument and voicing, the MK8 effect chain, the keyboard E1–E7](docs/images/tonewerk.png)
+
 The hybrid instruments of [pmpiano](https://github.com/Michi71/pmpiano) as a plugin and standalone app: Rhodes Mark I/II,
 Suitcase, MK8 (physical model), Wurlitzer 200A, Clavinet D6, Pianet T, the grands (SGP, Steinway, Grandpa's) and the Yamaha
 CP80, plus the MK8 effect chain. Built with [JUCE](https://juce.com) on the [Pamplejuce](https://github.com/sudara/pamplejuce)
@@ -74,6 +76,7 @@ CP80 have none and stay silent. The status line below the instrument choice tell
   delay is the lookahead of 24 input samples (0.54 ms at 44.1 kHz); passband flat to ±0.03 dB up to 18 kHz, 83–97 dB
   signal-to-noise (`tests/ResamplerTests.cpp`). `./Builds/Tests "[.latency]"` measures the time from note-on to the attack for
   every instrument.
+- The screenshot above is rendered by a hidden test: `TONEWERK_SNAPSHOT=$PWD/docs/images/tonewerk.png ./Builds/Tests "[.snapshot]"`.
 - A loader thread builds instruments (reads the bank, prepares the engine) and hands them over through an atomic pointer; the
   audio thread adopts them, fades the old one out and hands it back for deletion. Nothing is allocated or freed on the audio thread.
 - The effect chain (`pmp::Mk8Effects`) runs in the plugin at the host rate; the engine itself runs with `fx.on=0` and without
