@@ -14,6 +14,7 @@
 #include <core/mk8_fx.h>
 
 #include "InstrumentVoice.h"
+#include "Limiter.h"
 #include "PresetManager.h"
 #include "Reverb.h"
 
@@ -120,6 +121,7 @@ private:
     int sustain_ = 0;
     pmp::Mk8Effects fx_;
     tw::Reverb reverb_;
+    tw::Limiter limiter_;
     float fxGain_ = 0.0f, reverbGain_ = 0.0f, switchStep_ = 0.001f; // cross-fades of the stage switches
     juce::SmoothedValue<float> gain_ { 1.0f };
     juce::AudioBuffer<float> scratch_; // fading voice (0, 1), right channel of a mono output (2), a stage fading in or out (3, 4)

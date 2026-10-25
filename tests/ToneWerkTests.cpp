@@ -431,3 +431,105 @@ TEST_CASE ("The voicing reset button sets the voicing back to neutral", "[editor
     CHECK (!reset->isEnabled());
     plugin.editorBeingDeleted (editor.get());
 }
+
+// the level of every instrument before the soft clip: volume -24 dB, peaks and RMS referred back to 0 dB (hidden: "[.levels]")
+TEST_CASE ("Instrument levels before the soft clip", "[.levels]")
+{
+    if (!banksAvailable())
+        SKIP ("no banks found");
+    PluginProcessor plugin;
+    plugin.setRateAndBufferSizeDetails (48000.0, 512);
+    plugin.prepareToPlay (48000.0, 512);
+    setParam (plugin, tw::ids::volume, -24.0f);
+    struct Play
+    {
+        const char* name;
+        std::vector<int> notes;
+        int velocity;
+    };
+    const std::vector<Play> plays { { "C4 v100", { 60 }, 100 }, { "C4 v127", { 60 }, 127 },
+        { "chord4 v100", { 48, 55, 60, 64 }, 100 }, { "chord4 v127", { 48, 55, 60, 64 }, 127 },
+        { "chord8 v127", { 36, 43, 48, 52, 55, 60, 64, 67 }, 127 } };
+    for (int i = 0; i < pmp::Params::presetCount(); ++i)
+    {
+        setParam (plugin, tw::ids::instrument, float (i));
+        REQUIRE (waitForInstrument (plugin, 512));
+        juce::String line = juce::String (pmp::Params::presetId (i)).paddedRight (' ', 10);
+        for (const auto& play : plays)
+        {
+            juce::AudioBuffer<float> buffer (2, 512);
+            for (int b = 0; b < int (0.5 * 48000.0 / 512); ++b) // the previous notes off and gone
+            {
+                juce::MidiBuffer off;
+                if (b == 0)
+                    off.addEvent (juce::MidiMessage::allNotesOff (1), 0);
+                plugin.processBlock (buffer, off);
+            }
+            double peak = 0.0, sum = 0.0;
+            for (int b = 0; b < int (1.0 * 48000.0 / 512); ++b)
+            {
+                juce::MidiBuffer midi;
+                if (b == 0)
+                    for (const int note : play.notes)
+                        midi.addEvent (juce::MidiMessage::noteOn (1, note, (juce::uint8) play.velocity), 0);
+                buffer.clear();
+                plugin.processBlock (buffer, midi);
+                for (int ch = 0; ch < 2; ++ch)
+                    for (int k = 0; k < 512; ++k)
+                    {
+                        const double x = buffer.getSample (ch, k);
+                        peak = std::max (peak, std::abs (x));
+                        sum += x * x;
+                    }
+            }
+            const double peakDb = 20.0 * std::log10 (peak) + 24.0, rmsDb = 10.0 * std::log10 (sum / (2.0 * 48000.0)) + 24.0;
+            line << "  " << play.name << " " << juce::String (peakDb, 1) << "/" << juce::String (rmsDb, 1);
+        }
+        WARN (line);
+    }
+}
+
+// loud chords at volume 0 dB: the share of output samples inside the soft clip's range (|x| > 0.9), per instrument
+static double clippedShare (PluginProcessor& plugin, const std::vector<int>& notes, int velocity)
+{
+    juce::AudioBuffer<float> buffer (2, 512);
+    for (int b = 0; b < int (0.5 * 48000.0 / 512); ++b)
+    {
+        juce::MidiBuffer off;
+        if (b == 0)
+            off.addEvent (juce::MidiMessage::allNotesOff (1), 0);
+        plugin.processBlock (buffer, off);
+    }
+    long clipped = 0, total = 0;
+    for (int b = 0; b < int (1.0 * 48000.0 / 512); ++b)
+    {
+        juce::MidiBuffer midi;
+        if (b == 0)
+            for (const int note : notes)
+                midi.addEvent (juce::MidiMessage::noteOn (1, note, (juce::uint8) velocity), 0);
+        buffer.clear();
+        plugin.processBlock (buffer, midi);
+        for (int ch = 0; ch < 2; ++ch)
+            for (int k = 0; k < 512; ++k, ++total)
+                clipped += std::abs (buffer.getSample (ch, k)) > 0.9f ? 1 : 0;
+    }
+    return 100.0 * double (clipped) / double (total);
+}
+
+TEST_CASE ("Loud chords stay out of the soft clip", "[audio][levels]")
+{
+    if (!banksAvailable())
+        SKIP ("no banks found");
+    PluginProcessor plugin;
+    plugin.setRateAndBufferSizeDetails (48000.0, 512);
+    plugin.prepareToPlay (48000.0, 512);
+    for (const char* id : { "wurli200a", "clav6", "mk8", "grandpas" })
+    {
+        setParam (plugin, tw::ids::instrument, float (pmp::Params::presetIndex (id)));
+        REQUIRE (waitForInstrument (plugin, 512));
+        const double c4 = clippedShare (plugin, { 48, 55, 60, 64 }, 100), c8 = clippedShare (plugin, { 36, 43, 48, 52, 55, 60, 64, 67 }, 127);
+        WARN (id << ": samples in the soft clip, chord4 v100 " << c4 << " %, chord8 v127 " << c8 << " %");
+        CHECK (c4 < 0.01); // before the limiter and the level trims: up to 0.7 % (clavinet)
+        CHECK (c8 < 0.5);  // before: 1.5-13.7 %
+    }
+}

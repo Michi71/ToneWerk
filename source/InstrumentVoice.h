@@ -47,6 +47,9 @@ struct VoiceConfig
     }
 };
 
+// the plugin's level trim of an instrument [dB], on top of the engine preset (out.gain)
+float outputTrimDb (const juce::String& instrument);
+
 class InstrumentVoice
 {
 public:

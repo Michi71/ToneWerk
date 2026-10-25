@@ -58,7 +58,9 @@ CP80 have none and stay silent. The status line below the instrument choice tell
 ## Usage
 
 - **Instrument**: the presets of the engine. Switching loads the bank in the background; the previous instrument fades out in 30 ms.
-- **Volume** (−48 … +12 dB) after the effect chain, followed by the engine's soft clip.
+- **Volume** (−48 … +12 dB) after the effect chain, followed by a peak limiter (attack 0.1 ms, release 120 ms, no lookahead)
+  and the engine's soft clip as the last safeguard: full chords are turned down instead of distorted. The clavinet and the
+  Pianet are trimmed by −5 and −6.5 dB to the level of the other instruments.
 - **Voicing** on the poles and layers of the bank (pmpiano README "Voicing"): hardness, decay, unison, stretch. Every change
   rebuilds the instrument (after 250 ms without further changes); sounding notes stop. The settings stay when the instrument
   changes, and extremes carry over (hardness −200 takes up to 6 dB off the highs, decay +300 lets chords build up into the soft
