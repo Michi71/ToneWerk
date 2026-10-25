@@ -57,6 +57,8 @@ private:
     void savePresetDialog();
     void deletePreset();
     void showBankMenu();
+    void resetVoicing();
+    bool voicingIsNeutral() const;
 
     PluginProcessor& processor_;
     tw::LookAndFeel lnf_;
@@ -75,6 +77,7 @@ private:
     juce::Label status_;
     std::unique_ptr<tw::Knob> volume_, hardness_, decay_, unison_, stretch_;
     juce::Rectangle<int> instrumentPanel_, voicingTitle_;
+    juce::TextButton resetVoicing_ { "Reset" };
 
     // effects
     juce::Rectangle<int> fxPanel_;

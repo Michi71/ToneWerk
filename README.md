@@ -60,9 +60,12 @@ CP80 have none and stay silent. The status line below the instrument choice tell
 - **Instrument**: the presets of the engine. Switching loads the bank in the background; the previous instrument fades out in 30 ms.
 - **Volume** (−48 … +12 dB) after the effect chain, followed by the engine's soft clip.
 - **Voicing** on the poles and layers of the bank (pmpiano README "Voicing"): hardness, decay, unison, stretch. Every change
-  rebuilds the instrument (after 250 ms without further changes); sounding notes stop.
+  rebuilds the instrument (after 250 ms without further changes); sounding notes stop. The settings stay when the instrument
+  changes, and extremes carry over (hardness −200 takes up to 6 dB off the highs, decay +300 lets chords build up into the soft
+  clip): **Reset** sets all four back to the instrument as calibrated.
 - **Effects**: the MK8 chain in the units of the Rhodes V8 Pro – preamp (drive, envelope, level), equalizer, Vari-Pan,
-  compressor, chorus, phaser, delay. The **FX** switch bypasses the whole chain.
+  compressor, chorus, phaser, delay. The **FX** switch bypasses the whole chain; like the reverb switch it cross-fades over
+  20 ms, so switching while playing does not click.
 - **Reverb** at the end, on its own switch (independent of **FX**, so the grands get a room without the MK8 preamp): mix, size,
   decay (RT60 0.3–10 s), damping (how much faster the highs die away), pre-delay (0–200 ms), width. The grand presets have it on;
   Steinway and Grandpa's with less, their recordings carry some room already.
