@@ -3,13 +3,15 @@
 // InstrumentVoice.h - one prepared pmpiano engine (one instrument) and the resampler from its rate to the host rate
 //
 // A hybrid bank plays at its own rate only (44.1 kHz for the free-library banks, 48 kHz for the grand), so the engine runs at
-// the bank's rate and a windowed-sinc interpolator per channel converts to the host rate. Built and prepared off the audio
+// the bank's rate and a short windowed-sinc resampler (Resampler.h) converts to the host rate. Built and prepared off the audio
 // thread (InstrumentLoader); render() and the MIDI calls are real-time safe.
 #pragma once
 
 #include <juce_audio_basics/juce_audio_basics.h>
 
 #include <core/engine.h>
+
+#include "Resampler.h"
 
 #include <memory>
 #include <vector>
@@ -73,14 +75,12 @@ private:
     VoiceConfig config_;
     std::shared_ptr<BankImage> bank_;
     std::unique_ptr<pmp::Engine> engine_;
-    double engineRate_ = 48000.0, hostRate_ = 0.0, ratio_ = 1.0;
+    double engineRate_ = 48000.0, hostRate_ = 0.0;
     int maxFrames_ = 0;
     bool silent_ = false;
     juce::String status_;
 
-    // engine output not yet consumed by the interpolators
-    std::vector<float> fifoL_, fifoR_;
-    int fifoCount_ = 0;
-    juce::WindowedSincInterpolator interpL_, interpR_;
+    Resampler resampler_;
+    bool resample_ = false;
 };
 } // namespace tw

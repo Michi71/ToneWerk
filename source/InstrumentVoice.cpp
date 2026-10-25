@@ -6,7 +6,6 @@
 #include "Parameters.h"
 
 #include <cmath>
-#include <cstring>
 
 namespace tw
 {
@@ -88,38 +87,25 @@ void InstrumentVoice::prepare (double hostRate, int maxFrames)
 {
     hostRate_ = hostRate;
     maxFrames_ = juce::jmax (1, maxFrames);
-    ratio_ = engineRate_ / hostRate_;
-    const int capacity = int (std::ceil (maxFrames_ * ratio_)) + 64;
-    fifoL_.assign (size_t (capacity), 0.0f);
-    fifoR_.assign (size_t (capacity), 0.0f);
-    fifoCount_ = 0;
-    interpL_.reset();
-    interpR_.reset();
+    const double ratio = engineRate_ / hostRate_;
+    resample_ = std::abs (ratio - 1.0) > 1e-9;
+    if (resample_)
+        resampler_.prepare (ratio, maxFrames_);
 }
 
 void InstrumentVoice::render (float* left, float* right, int n)
 {
     jassert (n <= maxFrames_);
-    if (std::abs (ratio_ - 1.0) < 1e-9)
+    if (!resample_)
     {
         engine_->processStereo (left, right, n);
         return;
     }
-    // the interpolators take at most ceil(n * ratio) + 1 input samples for n outputs
-    const int need = juce::jmin (int (std::ceil (n * ratio_)) + 2, int (fifoL_.size()));
-    if (fifoCount_ < need)
+    if (const int m = resampler_.inputNeeded (n); m > 0)
     {
-        engine_->processStereo (fifoL_.data() + fifoCount_, fifoR_.data() + fifoCount_, need - fifoCount_);
-        fifoCount_ = need;
+        engine_->processStereo (resampler_.writeLeft(), resampler_.writeRight(), m);
+        resampler_.appended (m);
     }
-    const int used = interpL_.process (ratio_, fifoL_.data(), left, n);
-    interpR_.process (ratio_, fifoR_.data(), right, n);
-    const int rest = juce::jmax (0, fifoCount_ - used);
-    if (rest > 0 && used > 0)
-    {
-        std::memmove (fifoL_.data(), fifoL_.data() + used, size_t (rest) * sizeof (float));
-        std::memmove (fifoR_.data(), fifoR_.data() + used, size_t (rest) * sizeof (float));
-    }
-    fifoCount_ = rest;
+    resampler_.process (left, right, n);
 }
 } // namespace tw

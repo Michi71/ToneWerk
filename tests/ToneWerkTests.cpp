@@ -223,3 +223,51 @@ TEST_CASE ("Editor snapshot", "[.snapshot]")
     REQUIRE (juce::PNGImageFormat().writeImageToStream (image, out));
     plugin.editorBeingDeleted (editor.get());
 }
+
+// how long a note takes from its note-on to the attack, per instrument (hidden: ./Tests "[.latency]")
+TEST_CASE ("Note onset latency", "[.latency]")
+{
+    if (!banksAvailable())
+        SKIP ("no banks found");
+    for (const double rate : { 44100.0, 48000.0 })
+    {
+        PluginProcessor plugin;
+        constexpr int block = 64;
+        plugin.setRateAndBufferSizeDetails (rate, block);
+        plugin.prepareToPlay (rate, block);
+        for (int i = 0; i < pmp::Params::presetCount(); ++i)
+        {
+            setParam (plugin, tw::ids::instrument, float (i));
+            REQUIRE (waitForInstrument (plugin, block));
+            // let the switch fade settle, then play from silence
+            juce::AudioBuffer<float> buffer (2, block);
+            juce::MidiBuffer none;
+            for (int b = 0; b < int (0.2 * rate / block); ++b)
+                plugin.processBlock (buffer, none);
+            std::vector<float> out;
+            for (int b = 0; b < int (0.5 * rate / block); ++b)
+            {
+                juce::MidiBuffer midi;
+                if (b == 0)
+                    midi.addEvent (juce::MidiMessage::noteOn (1, 60, (juce::uint8) 100), 0);
+                buffer.clear();
+                plugin.processBlock (buffer, midi);
+                out.insert (out.end(), buffer.getReadPointer (0), buffer.getReadPointer (0) + block);
+            }
+            float peak = 0.0f;
+            size_t peakAt = 0;
+            for (size_t k = 0; k < out.size(); ++k)
+                if (std::abs (out[k]) > peak)
+                    peak = std::abs (out[k]), peakAt = k;
+            auto first = [&] (float fraction) {
+                for (size_t k = 0; k < out.size(); ++k)
+                    if (std::abs (out[k]) >= fraction * peak)
+                        return 1000.0 * double (k) / rate;
+                return -1.0;
+            };
+            WARN (juce::String (rate, 0) << " Hz  " << juce::String (pmp::Params::presetId (i)).paddedRight (' ', 10)
+                  << " -40 dB at " << juce::String (first (0.01f), 2) << " ms, -20 dB at " << juce::String (first (0.1f), 2)
+                  << " ms, peak at " << juce::String (1000.0 * double (peakAt) / rate, 2) << " ms");
+        }
+    }
+}
