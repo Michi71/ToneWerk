@@ -107,7 +107,7 @@ Section::Section (const String& title, juce::AudioProcessorValueTreeState& state
     if (switchId != nullptr)
     {
         switch_ = std::make_unique<juce::ToggleButton>();
-        switch_->setTooltip (title + " ein/aus");
+        switch_->setTooltip (title + " on/off");
         addAndMakeVisible (*switch_);
         switchAttachment_ = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment> (state, switchId, *switch_);
     }
@@ -166,14 +166,14 @@ PluginEditor::PluginEditor (PluginProcessor& p)
     auto& state = p.state();
 
     // header
-    savePreset_.setButtonText ("Speichern");
-    deletePreset_.setButtonText (utf8 ("L\xc3\xb6schen"));
-    banks_.setButtonText (utf8 ("Banken\xe2\x80\xa6"));
-    prevPreset_.setTooltip ("Voriges Preset");
-    nextPreset_.setTooltip (utf8 ("N\xc3\xa4" "chstes Preset"));
-    savePreset_.setTooltip ("Aktuelle Einstellungen als eigenes Preset speichern");
-    deletePreset_.setTooltip (utf8 ("Eigenes Preset l\xc3\xb6schen (in den Papierkorb)"));
-    banks_.setTooltip ("Ordner der Hybrid-Banken");
+    savePreset_.setButtonText ("Save");
+    deletePreset_.setButtonText ("Delete");
+    banks_.setButtonText (utf8 ("Banks\xe2\x80\xa6"));
+    prevPreset_.setTooltip ("Previous preset");
+    nextPreset_.setTooltip ("Next preset");
+    savePreset_.setTooltip ("Save the current settings as a user preset");
+    deletePreset_.setTooltip ("Delete the user preset (moves it to the trash)");
+    banks_.setTooltip ("Folder of the hybrid banks");
     for (auto* b : { &prevPreset_, &nextPreset_, &savePreset_, &deletePreset_, &banks_ })
         addAndMakeVisible (*b);
     prevPreset_.onClick = [this] { processor_.presets().step (-1); };
@@ -181,7 +181,7 @@ PluginEditor::PluginEditor (PluginProcessor& p)
     savePreset_.onClick = [this] { savePresetDialog(); };
     deletePreset_.onClick = [this] { deletePreset(); };
     banks_.onClick = [this] { showBankMenu(); };
-    presetBox_.setTextWhenNothingSelected ("(kein Preset)");
+    presetBox_.setTextWhenNothingSelected ("(no preset)");
     presetBox_.onChange = [this] {
         const int index = presetBox_.getSelectedId() - 1;
         if (index >= 0 && index < int (presetEntries_.size()))
@@ -199,17 +199,17 @@ PluginEditor::PluginEditor (PluginProcessor& p)
     status_.setJustificationType (juce::Justification::topLeft);
     status_.setMinimumHorizontalScale (0.8f);
     addAndMakeVisible (status_);
-    volume_ = std::make_unique<tw::Knob> (state, ids::volume, utf8 ("Lautst\xc3\xa4rke"));
-    hardness_ = std::make_unique<tw::Knob> (state, ids::hardness, utf8 ("Hammerh\xc3\xa4rte"));
-    decay_ = std::make_unique<tw::Knob> (state, ids::decay, "Abklingen");
-    unison_ = std::make_unique<tw::Knob> (state, ids::unison, "Chorbreite");
-    stretch_ = std::make_unique<tw::Knob> (state, ids::stretch, "Streckung");
+    volume_ = std::make_unique<tw::Knob> (state, ids::volume, "Volume");
+    hardness_ = std::make_unique<tw::Knob> (state, ids::hardness, "Hardness");
+    decay_ = std::make_unique<tw::Knob> (state, ids::decay, "Decay");
+    unison_ = std::make_unique<tw::Knob> (state, ids::unison, "Unison");
+    stretch_ = std::make_unique<tw::Knob> (state, ids::stretch, "Stretch");
     for (auto* k : { volume_.get(), hardness_.get(), decay_.get(), unison_.get(), stretch_.get() })
         addAndMakeVisible (*k);
 
     // effects
     fxOn_.setButtonText ("FX");
-    fxOn_.setTooltip ("Effektkette ein/aus");
+    fxOn_.setTooltip ("Effect chain on/off");
     addAndMakeVisible (fxOn_);
     fxOnAttachment_ = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment> (state, ids::fxOn, fxOn_);
     auto knob = [&state] (const char* id, const char* name) { return std::make_unique<tw::Knob> (state, id, utf8 (name)); };
@@ -218,30 +218,30 @@ PluginEditor::PluginEditor (PluginProcessor& p)
         addAndMakeVisible (*fxSections_.back());
         return fxSections_.back().get();
     };
-    auto* pre = section ("Vorstufe", nullptr);
+    auto* pre = section ("Preamp", nullptr);
     pre->add (knob (ids::fxDrive, "Drive"));
-    pre->add (knob (ids::fxEnvelope, "H\xc3\xbcllkurve"));
-    pre->add (knob (ids::fxVolume, "Pegel"));
+    pre->add (knob (ids::fxEnvelope, "Envelope"));
+    pre->add (knob (ids::fxVolume, "Level"));
     auto* eq = section ("Equalizer", nullptr);
     eq->add (knob (ids::fxBass, "Bass"));
-    eq->add (knob (ids::fxMid, "Mitten"));
-    eq->add (knob (ids::fxMidFreq, "Frequenz"));
-    eq->add (knob (ids::fxTreble, "H\xc3\xb6hen"));
+    eq->add (knob (ids::fxMid, "Mid"));
+    eq->add (knob (ids::fxMidFreq, "Mid Freq"));
+    eq->add (knob (ids::fxTreble, "Treble"));
     auto* pan = section ("Vari-Pan", ids::panOn);
-    pan->add (std::make_unique<ChoiceBox> (state, ids::panWave, "Form"), 1.3f);
+    pan->add (std::make_unique<ChoiceBox> (state, ids::panWave, "Wave"), 1.3f);
     pan->add (knob (ids::panRate, "Rate"));
-    pan->add (knob (ids::panDepth, "Tiefe"));
-    auto* comp = section ("Kompressor", ids::compOn);
-    comp->add (knob (ids::compAmount, "St\xc3\xa4rke"));
+    pan->add (knob (ids::panDepth, "Depth"));
+    auto* comp = section ("Compressor", ids::compOn);
+    comp->add (knob (ids::compAmount, "Amount"));
     comp->add (knob (ids::compMakeup, "Make-up"));
     auto* chorus = section ("Chorus", ids::chorusOn);
     chorus->add (knob (ids::chorusRate, "Rate"));
-    chorus->add (knob (ids::chorusDepth, "Tiefe"));
+    chorus->add (knob (ids::chorusDepth, "Depth"));
     auto* phaser = section ("Phaser", ids::phaserOn);
     phaser->add (knob (ids::phaserRate, "Rate"));
-    phaser->add (knob (ids::phaserDepth, "Tiefe"));
+    phaser->add (knob (ids::phaserDepth, "Depth"));
     auto* delay = section ("Delay", ids::delayOn);
-    delay->add (knob (ids::delayTime, "Zeit"));
+    delay->add (knob (ids::delayTime, "Time"));
     delay->add (knob (ids::delayFeedback, "Feedback"));
     delay->add (knob (ids::delayMix, "Mix"));
     delay->add (std::make_unique<Switch> (state, ids::delayPingPong, "Ping-Pong"));
@@ -300,7 +300,7 @@ void PluginEditor::paint (juce::Graphics& g)
     g.setColour (text);
     g.setFont (juce::FontOptions (15.0f, juce::Font::bold));
     g.drawText ("Instrument", instrumentPanel_.reduced (14, 0).removeFromTop (34), juce::Justification::centredLeft);
-    g.drawText ("Effekte", fxPanel_.reduced (14, 0).removeFromTop (34), juce::Justification::centredLeft);
+    g.drawText ("Effects", fxPanel_.reduced (14, 0).removeFromTop (34), juce::Justification::centredLeft);
     g.setFont (juce::FontOptions (13.0f, juce::Font::bold));
     g.setColour (dim);
     g.drawText ("Voicing", voicingTitle_, juce::Justification::centredLeft);
@@ -401,13 +401,13 @@ void PluginEditor::refreshPresetList()
     presetBox_.clear (juce::dontSendNotification);
     int selected = 0;
     bool userHeading = false;
-    presetBox_.addSectionHeading ("Werkspresets");
+    presetBox_.addSectionHeading ("Factory presets");
     for (size_t i = 0; i < presetEntries_.size(); ++i)
     {
         const auto& e = presetEntries_[i];
         if (!e.factory && !userHeading)
         {
-            presetBox_.addSectionHeading ("Eigene Presets");
+            presetBox_.addSectionHeading ("User presets");
             userHeading = true;
         }
         presetBox_.addItem (e.name, int (i) + 1);
@@ -425,7 +425,7 @@ void PluginEditor::confirm (const String& title, const String& message, const St
                              .withTitle (title)
                              .withMessage (message)
                              .withButton (yes, 1)
-                             .withButton ("Abbrechen", 0)
+                             .withButton ("Cancel", 0)
                              .withAssociatedComponent (this);
     juce::AlertWindow::showAsync (options, [action = std::move (then)] (int result) {
         if (result == 1)
@@ -435,11 +435,11 @@ void PluginEditor::confirm (const String& title, const String& message, const St
 
 void PluginEditor::savePresetDialog()
 {
-    auto* w = new juce::AlertWindow ("Preset speichern", "Name des Presets:", juce::MessageBoxIconType::NoIcon, this);
+    auto* w = new juce::AlertWindow ("Save preset", "Preset name:", juce::MessageBoxIconType::NoIcon, this);
     const auto& presets = processor_.presets();
     w->addTextEditor ("name", presets.currentIsFactory() ? String() : presets.currentName());
-    w->addButton ("Speichern", 1, juce::KeyPress (juce::KeyPress::returnKey));
-    w->addButton ("Abbrechen", 0, juce::KeyPress (juce::KeyPress::escapeKey));
+    w->addButton ("Save", 1, juce::KeyPress (juce::KeyPress::returnKey));
+    w->addButton ("Cancel", 0, juce::KeyPress (juce::KeyPress::escapeKey));
     w->setLookAndFeel (&lnf_);
     w->enterModalState (true, juce::ModalCallbackFunction::create ([this, w] (int result) {
         const auto name = w->getTextEditorContents ("name").trim();
@@ -448,8 +448,8 @@ void PluginEditor::savePresetDialog()
         auto& pm = processor_.presets();
         auto write = [this, name] {
             if (!processor_.presets().save (name))
-                juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::WarningIcon, "Preset speichern",
-                    "Das Preset konnte nicht gespeichert werden:\n" + processor_.presets().folder().getFullPathName(), "OK", this);
+                juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::WarningIcon, "Save preset",
+                    "The preset could not be saved:\n" + processor_.presets().folder().getFullPathName(), "OK", this);
             refreshPresetList();
         };
         if (!pm.exists (name))
@@ -457,8 +457,7 @@ void PluginEditor::savePresetDialog()
             write();
             return;
         }
-        confirm ("Preset speichern", utf8 ("\xe2\x80\x9e") + name + utf8 ("\xe2\x80\x9c gibt es schon. \xc3\x9c" "berschreiben?"),
-            utf8 ("\xc3\x9c" "berschreiben"), write);
+        confirm ("Save preset", utf8 ("\xe2\x80\x9c") + name + utf8 ("\xe2\x80\x9d already exists. Overwrite it?"), "Overwrite", write);
     }),
         true);
 }
@@ -469,8 +468,7 @@ void PluginEditor::deletePreset()
     if (presets.currentIsFactory() || presets.currentName().isEmpty())
         return;
     const auto name = presets.currentName();
-    confirm (utf8 ("Preset l\xc3\xb6schen"), utf8 ("\xe2\x80\x9e") + name + utf8 ("\xe2\x80\x9c in den Papierkorb legen?"),
-        utf8 ("L\xc3\xb6schen"), [this, name] {
+    confirm ("Delete preset", "Move " + utf8 ("\xe2\x80\x9c") + name + utf8 ("\xe2\x80\x9d to the trash?"), "Delete", [this, name] {
             processor_.presets().remove (name);
             refreshPresetList();
         });
@@ -480,21 +478,21 @@ void PluginEditor::showBankMenu()
 {
     const auto chosen = tw::userBankFolder();
     juce::PopupMenu m;
-    m.addSectionHeader (utf8 ("Hybrid-Banken"));
-    m.addItem (1, utf8 ("Ordner w\xc3\xa4hlen\xe2\x80\xa6"));
-    m.addItem (2, utf8 ("Auswahl zur\xc3\xbc" "cksetzen") + (chosen != juce::File() ? " (" + chosen.getFullPathName() + ")" : String()),
+    m.addSectionHeader ("Hybrid banks");
+    m.addItem (1, utf8 ("Choose folder\xe2\x80\xa6"));
+    m.addItem (2, String ("Reset choice") + (chosen != juce::File() ? " (" + chosen.getFullPathName() + ")" : String()),
         chosen != juce::File());
-    m.addItem (3, utf8 ("Standardordner \xc3\xb6" "ffnen (") + tw::defaultUserBankFolder().getFullPathName() + ")");
-    m.addItem (4, "Banken neu laden");
+    m.addItem (3, String ("Open default folder (") + tw::defaultUserBankFolder().getFullPathName() + ")");
+    m.addItem (4, "Reload banks");
     m.addSeparator();
     juce::PopupMenu where;
     for (const auto& f : tw::bankSearchFolders())
         where.addItem (f.getFullPathName(), false, f.isDirectory(), nullptr);
-    m.addSubMenu ("Suchreihenfolge", where);
+    m.addSubMenu ("Search order", where);
     m.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (banks_), [this] (int result) {
         if (result == 1)
         {
-            chooser_ = std::make_unique<juce::FileChooser> (utf8 ("Ordner mit den Banken (*.bank) w\xc3\xa4hlen"),
+            chooser_ = std::make_unique<juce::FileChooser> ("Choose the folder with the banks (*.bank)",
                 tw::defaultUserBankFolder());
             chooser_->launchAsync (juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectDirectories,
                 [this] (const juce::FileChooser& fc) {
