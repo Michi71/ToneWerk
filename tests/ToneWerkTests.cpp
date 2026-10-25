@@ -105,6 +105,7 @@ TEST_CASE ("A note sounds, at the bank's rate and resampled", "[audio]")
             PluginProcessor plugin;
             plugin.setRateAndBufferSizeDetails (rate, 256);
             plugin.prepareToPlay (rate, 256);
+            setParam (plugin, tw::ids::humanize, 0.0f); // measurements at the nominal velocity
             REQUIRE (waitForInstrument (plugin, 256));
             INFO (plugin.instrumentStatus());
             const auto [l, r] = playNote (plugin, rate, 256, 60, 1.0);
@@ -122,6 +123,7 @@ TEST_CASE ("Every instrument builds and plays or reports why not", "[audio][inst
     PluginProcessor plugin;
     plugin.setRateAndBufferSizeDetails (48000.0, 512);
     plugin.prepareToPlay (48000.0, 512);
+    setParam (plugin, tw::ids::humanize, 0.0f); // measurements at the nominal velocity
     for (int i = 0; i < pmp::Params::presetCount(); ++i)
     {
         INFO ("instrument " << pmp::Params::presetId (i));
@@ -139,6 +141,7 @@ TEST_CASE ("The effect chain changes the sound and stays bounded", "[audio][fx]"
     PluginProcessor plugin;
     plugin.setRateAndBufferSizeDetails (48000.0, 512);
     plugin.prepareToPlay (48000.0, 512);
+    setParam (plugin, tw::ids::humanize, 0.0f); // measurements at the nominal velocity
     REQUIRE (waitForInstrument (plugin, 512));
     const auto dry = playNote (plugin, 48000.0, 512, 55, 0.8);
     setParam (plugin, tw::ids::fxOn, 1.0f);
@@ -155,6 +158,7 @@ TEST_CASE ("The reverb lengthens the release", "[audio][reverb]")
         PluginProcessor plugin;
         plugin.setRateAndBufferSizeDetails (48000.0, 512);
         plugin.prepareToPlay (48000.0, 512);
+        setParam (plugin, tw::ids::humanize, 0.0f); // measurements at the nominal velocity
         REQUIRE (waitForInstrument (plugin, 512));
         setParam (plugin, tw::ids::reverbOn, reverb ? 1.0f : 0.0f);
         setParam (plugin, tw::ids::reverbDecay, 3.0f);
@@ -191,6 +195,7 @@ static double switchClick (const char* switchId, bool on)
     constexpr int block = 256;
     plugin.setRateAndBufferSizeDetails (rate, block);
     plugin.prepareToPlay (rate, block);
+    setParam (plugin, tw::ids::humanize, 0.0f); // measurements at the nominal velocity
     REQUIRE (waitForInstrument (plugin, block));
     setParam (plugin, switchId, on ? 0.0f : 1.0f);
     juce::AudioBuffer<float> buffer (2, block);
@@ -315,6 +320,7 @@ TEST_CASE ("Note onset latency", "[.latency]")
         constexpr int block = 64;
         plugin.setRateAndBufferSizeDetails (rate, block);
         plugin.prepareToPlay (rate, block);
+        setParam (plugin, tw::ids::humanize, 0.0f); // measurements at the nominal velocity
         for (int i = 0; i < pmp::Params::presetCount(); ++i)
         {
             setParam (plugin, tw::ids::instrument, float (i));
@@ -369,6 +375,7 @@ TEST_CASE ("Voicing extremes per instrument", "[.voicing]")
     PluginProcessor plugin;
     plugin.setRateAndBufferSizeDetails (48000.0, 512);
     plugin.prepareToPlay (48000.0, 512);
+    setParam (plugin, tw::ids::humanize, 0.0f); // measurements at the nominal velocity
     for (int i = 0; i < pmp::Params::presetCount(); ++i)
     {
         double rms0 = 0.0, bright0 = 0.0;
@@ -440,6 +447,7 @@ TEST_CASE ("Instrument levels before the soft clip", "[.levels]")
     PluginProcessor plugin;
     plugin.setRateAndBufferSizeDetails (48000.0, 512);
     plugin.prepareToPlay (48000.0, 512);
+    setParam (plugin, tw::ids::humanize, 0.0f); // measurements at the nominal velocity
     setParam (plugin, tw::ids::volume, -24.0f);
     struct Play
     {
@@ -523,6 +531,7 @@ TEST_CASE ("Loud chords stay out of the soft clip", "[audio][levels]")
     PluginProcessor plugin;
     plugin.setRateAndBufferSizeDetails (48000.0, 512);
     plugin.prepareToPlay (48000.0, 512);
+    setParam (plugin, tw::ids::humanize, 0.0f); // measurements at the nominal velocity
     for (const char* id : { "wurli200a", "clav6", "mk8", "grandpas" })
     {
         setParam (plugin, tw::ids::instrument, float (pmp::Params::presetIndex (id)));

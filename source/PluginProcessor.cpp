@@ -28,6 +28,7 @@ PluginProcessor::PluginProcessor()
     decay_ = raw (ids::decay);
     unison_ = raw (ids::unison);
     stretch_ = raw (ids::stretch);
+    humanizeAmount_ = raw (ids::humanize);
     fxp_ = { raw (ids::fxOn), raw (ids::fxVolume), raw (ids::fxDrive), raw (ids::fxEnvelope), raw (ids::fxBass), raw (ids::fxMid),
         raw (ids::fxMidFreq), raw (ids::fxTreble), raw (ids::panOn), raw (ids::panWave), raw (ids::panRate), raw (ids::panDepth),
         raw (ids::compOn), raw (ids::compAmount), raw (ids::compMakeup), raw (ids::chorusOn), raw (ids::chorusRate),
@@ -219,7 +220,7 @@ void PluginProcessor::handleMidi (const juce::MidiMessage& m)
     if (active_ == nullptr)
         return;
     if (m.isNoteOn())
-        active_->noteOn (m.getNoteNumber(), m.getVelocity());
+        active_->noteOn (m.getNoteNumber(), humanize_.apply (m.getVelocity(), double (humanizeAmount_->load()) * 0.01));
     else if (m.isNoteOff())
         active_->noteOff (m.getNoteNumber());
     else if (m.isAllNotesOff())

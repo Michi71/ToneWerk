@@ -67,6 +67,7 @@ Layout createParameterLayout()
     inst->addChild (number (ids::decay, "Decay", { -90.0f, 300.0f, 1.0f }, 0.0f, "%", 0));
     inst->addChild (number (ids::unison, "Unison", { -100.0f, 200.0f, 1.0f }, 0.0f, "%", 0));
     inst->addChild (number (ids::stretch, "Stretch", { -20.0f, 20.0f, 0.1f }, 0.0f, "ct/oct"));
+    inst->addChild (number (ids::humanize, "Humanize", { 0.0f, 100.0f, 1.0f }, 50.0f, "%", 0));
     layout.add (std::move (inst));
 
     auto fx = std::make_unique<juce::AudioProcessorParameterGroup> ("fx", "Effects", "|");
@@ -120,7 +121,8 @@ const juce::StringArray& allParameterIds()
         ids::panOn, ids::panWave, ids::panRate, ids::panDepth, ids::compOn, ids::compAmount, ids::compMakeup,
         ids::chorusOn, ids::chorusRate, ids::chorusDepth, ids::phaserOn, ids::phaserRate, ids::phaserDepth,
         ids::delayOn, ids::delayTime, ids::delayFeedback, ids::delayMix, ids::delayPingPong,
-        ids::reverbOn, ids::reverbMix, ids::reverbSize, ids::reverbDecay, ids::reverbDamping, ids::reverbPredelay, ids::reverbWidth
+        ids::reverbOn, ids::reverbMix, ids::reverbSize, ids::reverbDecay, ids::reverbDamping, ids::reverbPredelay, ids::reverbWidth,
+        ids::humanize
     };
     return all;
 }

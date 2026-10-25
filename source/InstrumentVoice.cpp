@@ -58,6 +58,7 @@ InstrumentVoice::InstrumentVoice (const VoiceConfig& config, std::shared_ptr<Ban
     p.voicing.stretch = config.stretch;
     p.fxOn = 0.0f;     // the effect chain runs in the plugin at the host rate
     p.softClip = 0.0f; // so does the soft clip, behind it
+    p.humanSpeed = 0.0f; // the strike variation is the plugin's Humanize, for every instrument
     p.masterGain *= float (juce::Decibels::decibelsToGain (outputTrimDb (id)));
 
     const bool wantsBank = p.hybridOn > 0.5f;
