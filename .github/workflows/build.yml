@@ -1,0 +1,151 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-FileCopyrightText: 2026 Michi71
+# Build, test and validate ToneWerk on macOS, Linux and Windows (from the Pamplejuce template, without signing and IPP).
+# The banks (Git LFS, ~160 MB) are not checked out here: the LFS bandwidth of a private repository is small. Only a release
+# (tag v*) fetches them once and attaches them as a zip of their own.
+name: Build
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  BUILD_TYPE: Release
+  BUILD_DIR: Builds
+  DISPLAY: :0 # pluginval on Linux
+  HOMEBREW_NO_INSTALL_CLEANUP: 1
+  SCCACHE_GHA_ENABLED: true
+  SCCACHE_CACHE_MULTIARCH: 1
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  build:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Linux
+            os: ubuntu-22.04
+            pluginval-binary: ./pluginval
+            extra-flags: -G Ninja -DCMAKE_EXE_LINKER_FLAGS=-fuse-ld=lld -DCMAKE_SHARED_LINKER_FLAGS=-fuse-ld=lld -DCMAKE_MODULE_LINKER_FLAGS=-fuse-ld=lld
+          - name: macOS
+            os: macos-14
+            pluginval-binary: pluginval.app/Contents/MacOS/pluginval
+            extra-flags: -G Ninja -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64"
+          - name: Windows
+            os: windows-latest
+            pluginval-binary: ./pluginval.exe
+            extra-flags: -G Ninja -DCMAKE_C_COMPILER=clang-cl -DCMAKE_CXX_COMPILER=clang-cl
+
+    steps:
+      - uses: ilammy/msvc-dev-cmd@v1
+
+      - name: Set up Clang
+        if: runner.os == 'Linux'
+        uses: egor-tensin/setup-clang@v2
+
+      - name: Install JUCE's Linux deps
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libasound2-dev libjack-jackd2-dev libx11-dev libxi-dev libxinerama-dev libxext-dev \
+            libxrandr-dev libxcursor-dev libfreetype6-dev libfontconfig1-dev libglu1-mesa-dev xvfb ninja-build
+          sudo /usr/bin/Xvfb $DISPLAY &
+
+      - name: Install Ninja (Windows)
+        if: runner.os == 'Windows'
+        run: choco install ninja
+
+      - name: Install Ninja (macOS)
+        if: runner.os == 'macOS'
+        run: brew install ninja
+
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          lfs: false
+
+      - name: Cache the build
+        uses: mozilla-actions/sccache-action@v0.0.9
+
+      - name: Configure
+        run: cmake -B ${{ env.BUILD_DIR }} -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} -DTONEWERK_DEV_BANKS=OFF -DCMAKE_C_COMPILER_LAUNCHER=sccache -DCMAKE_CXX_COMPILER_LAUNCHER=sccache ${{ matrix.extra-flags }} .
+
+      - name: Build
+        run: cmake --build ${{ env.BUILD_DIR }} --config ${{ env.BUILD_TYPE }}
+
+      - name: Test
+        working-directory: ${{ env.BUILD_DIR }}
+        run: ctest --output-on-failure
+
+      - name: Read in .env from CMake
+        run: |
+          cat .env
+          cat .env >> $GITHUB_ENV
+
+      - name: Paths
+        run: |
+          ARTIFACTS_PATH=${{ env.BUILD_DIR }}/${{ env.PROJECT_NAME }}_artefacts/${{ env.BUILD_TYPE }}
+          echo "ARTIFACTS_PATH=$ARTIFACTS_PATH" >> $GITHUB_ENV
+          echo "VST3_PATH=$ARTIFACTS_PATH/VST3/${{ env.PRODUCT_NAME }}.vst3" >> $GITHUB_ENV
+          echo "ARTIFACT_NAME=${{ env.PRODUCT_NAME }}-${{ env.VERSION }}-${{ runner.os }}" >> $GITHUB_ENV
+
+      - name: Pluginval
+        run: |
+          curl -LO "https://github.com/Tracktion/pluginval/releases/download/v1.0.4/pluginval_${{ runner.os }}.zip"
+          7z x pluginval_${{ runner.os }}.zip
+          ${{ matrix.pluginval-binary }} --strictness-level 10 --verbose --validate "${{ env.VST3_PATH }}"
+
+      - name: Zip
+        working-directory: ${{ env.ARTIFACTS_PATH }}
+        run: 7z a -tzip "${{ env.ARTIFACT_NAME }}.zip" "-xr!*.a" "-xr!*.lib" "-xr!*.pdb" .
+
+      - name: Upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.ARTIFACT_NAME }}
+          path: ${{ env.ARTIFACTS_PATH }}/${{ env.ARTIFACT_NAME }}.zip
+
+  banks:
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout with LFS
+        uses: actions/checkout@v4
+        with:
+          lfs: true
+      - name: Zip the banks
+        run: |
+          cp docs/BANKS.md banks/
+          cd banks && zip -9 ../ToneWerk-Banks.zip *.bank BANKS.md
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ToneWerk-Banks
+          path: ToneWerk-Banks.zip
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    needs: [build, banks]
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+      - uses: softprops/action-gh-release@v2
+        with:
+          prerelease: true
+          files: |
+            */*.zip

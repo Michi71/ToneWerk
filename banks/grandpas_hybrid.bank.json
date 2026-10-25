@@ -1,0 +1,837 @@
+{
+ "bank": "grandpas_hybrid.bank",
+ "version": 5,
+ "rate": 44100,
+ "bytes": 24878176,
+ "mib": 23.73,
+ "state": "grandpas-k48c3-g2.10-f12",
+ "keys": [
+  28,
+  100
+ ],
+ "anchors": [
+  25,
+  45,
+  75,
+  105,
+  127
+ ],
+ "payloadCrc32": 1911824043,
+ "loudness": {
+  "level": 1.2567907934226814,
+  "refVel": 100.0,
+  "gamma": 2.1,
+  "trimDb": {
+   "28": 0.0,
+   "29": 0.0,
+   "30": 0.0,
+   "31": 0.0,
+   "32": 0.0,
+   "33": 0.0,
+   "34": 0.0,
+   "35": 0.0,
+   "36": 0.0,
+   "37": 0.0,
+   "38": 0.0,
+   "39": 0.0,
+   "40": 0.0,
+   "41": 0.0,
+   "42": 0.0,
+   "43": 0.0,
+   "44": 0.0,
+   "45": 0.0,
+   "46": 0.0,
+   "47": 0.0,
+   "48": 0.0,
+   "49": 0.0,
+   "50": 0.0,
+   "51": 0.0,
+   "52": 0.0,
+   "53": 0.0,
+   "54": 0.0,
+   "55": 0.0,
+   "56": 0.0,
+   "57": 0.0,
+   "58": 0.0,
+   "59": 0.0,
+   "60": 0.0,
+   "61": 0.0,
+   "62": 0.0,
+   "63": 0.0,
+   "64": 0.0,
+   "65": 0.0,
+   "66": 0.0,
+   "67": 0.0,
+   "68": 0.0,
+   "69": 0.0,
+   "70": 0.0,
+   "71": 0.0,
+   "72": 0.0,
+   "73": 0.0,
+   "74": 0.0,
+   "75": 0.0,
+   "76": 0.0,
+   "77": 0.0,
+   "78": 0.0,
+   "79": 0.0,
+   "80": 0.0,
+   "81": 0.0,
+   "82": 0.0,
+   "83": 0.0,
+   "84": 0.0,
+   "85": 0.0,
+   "86": 0.0,
+   "87": 0.0,
+   "88": 0.0,
+   "89": 0.0,
+   "90": 0.0,
+   "91": 0.0,
+   "92": 0.0,
+   "93": 0.0,
+   "94": 0.0,
+   "95": 0.0,
+   "96": 0.0,
+   "97": 0.0,
+   "98": 0.0,
+   "99": 0.0,
+   "100": 0.0
+  }
+ },
+ "sections_mib": {
+  "states": 3.4,
+  "pcm16": 5.95,
+  "loopPcm": 12.6
+ },
+ "perKey": {
+  "28": {
+   "root": 29,
+   "shiftCents": -88.0,
+   "modes": 48,
+   "loopBands": 7,
+   "crossfadeMs": [
+    263.0,
+    315.6
+   ]
+  },
+  "29": {
+   "root": 29,
+   "shiftCents": 12.0,
+   "modes": 48,
+   "loopBands": 7,
+   "crossfadeMs": [
+    248.3,
+    297.9
+   ]
+  },
+  "30": {
+   "root": 29,
+   "shiftCents": 112.0,
+   "modes": 48,
+   "loopBands": 7,
+   "crossfadeMs": [
+    234.3,
+    281.2
+   ]
+  },
+  "31": {
+   "root": 29,
+   "shiftCents": 212.0,
+   "modes": 48,
+   "loopBands": 7,
+   "crossfadeMs": [
+    221.2,
+    265.4
+   ]
+  },
+  "32": {
+   "root": 34,
+   "shiftCents": -202.6,
+   "modes": 48,
+   "loopBands": 6,
+   "crossfadeMs": [
+    281.0,
+    337.3
+   ]
+  },
+  "33": {
+   "root": 34,
+   "shiftCents": -102.6,
+   "modes": 48,
+   "loopBands": 6,
+   "crossfadeMs": [
+    265.3,
+    318.3
+   ]
+  },
+  "34": {
+   "root": 34,
+   "shiftCents": -2.6,
+   "modes": 48,
+   "loopBands": 6,
+   "crossfadeMs": [
+    250.4,
+    300.5
+   ]
+  },
+  "35": {
+   "root": 34,
+   "shiftCents": 97.4,
+   "modes": 48,
+   "loopBands": 6,
+   "crossfadeMs": [
+    236.3,
+    283.6
+   ]
+  },
+  "36": {
+   "root": 34,
+   "shiftCents": 197.4,
+   "modes": 48,
+   "loopBands": 6,
+   "crossfadeMs": [
+    223.1,
+    267.7
+   ]
+  },
+  "37": {
+   "root": 39,
+   "shiftCents": -190.9,
+   "modes": 47,
+   "loopBands": 6,
+   "crossfadeMs": [
+    279.1,
+    335.0
+   ]
+  },
+  "38": {
+   "root": 39,
+   "shiftCents": -90.9,
+   "modes": 47,
+   "loopBands": 6,
+   "crossfadeMs": [
+    263.5,
+    316.2
+   ]
+  },
+  "39": {
+   "root": 39,
+   "shiftCents": 9.1,
+   "modes": 47,
+   "loopBands": 6,
+   "crossfadeMs": [
+    248.7,
+    298.4
+   ]
+  },
+  "40": {
+   "root": 39,
+   "shiftCents": 109.1,
+   "modes": 47,
+   "loopBands": 6,
+   "crossfadeMs": [
+    234.7,
+    281.7
+   ]
+  },
+  "41": {
+   "root": 39,
+   "shiftCents": 209.1,
+   "modes": 47,
+   "loopBands": 6,
+   "crossfadeMs": [
+    221.5,
+    265.9
+   ]
+  },
+  "42": {
+   "root": 44,
+   "shiftCents": -202.1,
+   "modes": 47,
+   "loopBands": 6,
+   "crossfadeMs": [
+    281.0,
+    337.1
+   ]
+  },
+  "43": {
+   "root": 44,
+   "shiftCents": -102.1,
+   "modes": 47,
+   "loopBands": 6,
+   "crossfadeMs": [
+    265.2,
+    318.2
+   ]
+  },
+  "44": {
+   "root": 44,
+   "shiftCents": -2.1,
+   "modes": 47,
+   "loopBands": 6,
+   "crossfadeMs": [
+    250.3,
+    300.4
+   ]
+  },
+  "45": {
+   "root": 44,
+   "shiftCents": 97.9,
+   "modes": 47,
+   "loopBands": 6,
+   "crossfadeMs": [
+    236.3,
+    283.5
+   ]
+  },
+  "46": {
+   "root": 44,
+   "shiftCents": 197.9,
+   "modes": 47,
+   "loopBands": 6,
+   "crossfadeMs": [
+    223.0,
+    267.6
+   ]
+  },
+  "47": {
+   "root": 49,
+   "shiftCents": -204.5,
+   "modes": 46,
+   "loopBands": 5,
+   "crossfadeMs": [
+    281.3,
+    337.6
+   ]
+  },
+  "48": {
+   "root": 49,
+   "shiftCents": -104.5,
+   "modes": 46,
+   "loopBands": 5,
+   "crossfadeMs": [
+    265.6,
+    318.7
+   ]
+  },
+  "49": {
+   "root": 49,
+   "shiftCents": -4.5,
+   "modes": 46,
+   "loopBands": 5,
+   "crossfadeMs": [
+    250.6,
+    300.8
+   ]
+  },
+  "50": {
+   "root": 49,
+   "shiftCents": 95.5,
+   "modes": 46,
+   "loopBands": 5,
+   "crossfadeMs": [
+    236.6,
+    283.9
+   ]
+  },
+  "51": {
+   "root": 49,
+   "shiftCents": 195.5,
+   "modes": 46,
+   "loopBands": 5,
+   "crossfadeMs": [
+    223.3,
+    268.0
+   ]
+  },
+  "52": {
+   "root": 54,
+   "shiftCents": -205.8,
+   "modes": 48,
+   "loopBands": 5,
+   "crossfadeMs": [
+    281.6,
+    337.9
+   ]
+  },
+  "53": {
+   "root": 54,
+   "shiftCents": -105.8,
+   "modes": 48,
+   "loopBands": 5,
+   "crossfadeMs": [
+    265.8,
+    318.9
+   ]
+  },
+  "54": {
+   "root": 54,
+   "shiftCents": -5.8,
+   "modes": 48,
+   "loopBands": 5,
+   "crossfadeMs": [
+    250.8,
+    301.0
+   ]
+  },
+  "55": {
+   "root": 54,
+   "shiftCents": 94.2,
+   "modes": 48,
+   "loopBands": 5,
+   "crossfadeMs": [
+    236.8,
+    284.1
+   ]
+  },
+  "56": {
+   "root": 54,
+   "shiftCents": 194.2,
+   "modes": 48,
+   "loopBands": 5,
+   "crossfadeMs": [
+    223.5,
+    268.2
+   ]
+  },
+  "57": {
+   "root": 59,
+   "shiftCents": -204.3,
+   "modes": 46,
+   "loopBands": 4,
+   "crossfadeMs": [
+    281.3,
+    337.6
+   ]
+  },
+  "58": {
+   "root": 59,
+   "shiftCents": -104.3,
+   "modes": 46,
+   "loopBands": 4,
+   "crossfadeMs": [
+    265.5,
+    318.6
+   ]
+  },
+  "59": {
+   "root": 59,
+   "shiftCents": -4.3,
+   "modes": 46,
+   "loopBands": 4,
+   "crossfadeMs": [
+    250.6,
+    300.7
+   ]
+  },
+  "60": {
+   "root": 59,
+   "shiftCents": 95.7,
+   "modes": 46,
+   "loopBands": 4,
+   "crossfadeMs": [
+    236.6,
+    283.9
+   ]
+  },
+  "61": {
+   "root": 59,
+   "shiftCents": 195.7,
+   "modes": 46,
+   "loopBands": 4,
+   "crossfadeMs": [
+    223.3,
+    267.9
+   ]
+  },
+  "62": {
+   "root": 64,
+   "shiftCents": -205.4,
+   "modes": 43,
+   "loopBands": 4,
+   "crossfadeMs": [
+    90.1,
+    112.6
+   ]
+  },
+  "63": {
+   "root": 64,
+   "shiftCents": -105.4,
+   "modes": 43,
+   "loopBands": 4,
+   "crossfadeMs": [
+    85.0,
+    106.3
+   ]
+  },
+  "64": {
+   "root": 64,
+   "shiftCents": -5.4,
+   "modes": 43,
+   "loopBands": 4,
+   "crossfadeMs": [
+    80.2,
+    100.3
+   ]
+  },
+  "65": {
+   "root": 64,
+   "shiftCents": 94.6,
+   "modes": 43,
+   "loopBands": 4,
+   "crossfadeMs": [
+    75.7,
+    94.7
+   ]
+  },
+  "66": {
+   "root": 64,
+   "shiftCents": 194.6,
+   "modes": 43,
+   "loopBands": 4,
+   "crossfadeMs": [
+    71.5,
+    89.4
+   ]
+  },
+  "67": {
+   "root": 69,
+   "shiftCents": -213.2,
+   "modes": 38,
+   "loopBands": 6,
+   "crossfadeMs": [
+    90.5,
+    113.1
+   ]
+  },
+  "68": {
+   "root": 69,
+   "shiftCents": -113.2,
+   "modes": 38,
+   "loopBands": 6,
+   "crossfadeMs": [
+    85.4,
+    106.8
+   ]
+  },
+  "69": {
+   "root": 69,
+   "shiftCents": -13.2,
+   "modes": 38,
+   "loopBands": 6,
+   "crossfadeMs": [
+    80.6,
+    100.8
+   ]
+  },
+  "70": {
+   "root": 69,
+   "shiftCents": 86.8,
+   "modes": 38,
+   "loopBands": 6,
+   "crossfadeMs": [
+    76.1,
+    95.1
+   ]
+  },
+  "71": {
+   "root": 69,
+   "shiftCents": 186.8,
+   "modes": 38,
+   "loopBands": 6,
+   "crossfadeMs": [
+    71.8,
+    89.8
+   ]
+  },
+  "72": {
+   "root": 74,
+   "shiftCents": -212.2,
+   "modes": 36,
+   "loopBands": 5,
+   "crossfadeMs": [
+    90.4,
+    113.0
+   ]
+  },
+  "73": {
+   "root": 74,
+   "shiftCents": -112.2,
+   "modes": 36,
+   "loopBands": 5,
+   "crossfadeMs": [
+    85.4,
+    106.7
+   ]
+  },
+  "74": {
+   "root": 74,
+   "shiftCents": -12.2,
+   "modes": 36,
+   "loopBands": 5,
+   "crossfadeMs": [
+    80.6,
+    100.7
+   ]
+  },
+  "75": {
+   "root": 74,
+   "shiftCents": 87.8,
+   "modes": 36,
+   "loopBands": 5,
+   "crossfadeMs": [
+    76.0,
+    95.1
+   ]
+  },
+  "76": {
+   "root": 74,
+   "shiftCents": 187.8,
+   "modes": 36,
+   "loopBands": 5,
+   "crossfadeMs": [
+    71.8,
+    89.7
+   ]
+  },
+  "77": {
+   "root": 79,
+   "shiftCents": -209.5,
+   "modes": 38,
+   "loopBands": 6,
+   "crossfadeMs": [
+    90.3,
+    112.9
+   ]
+  },
+  "78": {
+   "root": 79,
+   "shiftCents": -109.5,
+   "modes": 38,
+   "loopBands": 6,
+   "crossfadeMs": [
+    85.2,
+    106.5
+   ]
+  },
+  "79": {
+   "root": 79,
+   "shiftCents": -9.5,
+   "modes": 38,
+   "loopBands": 6,
+   "crossfadeMs": [
+    80.4,
+    100.5
+   ]
+  },
+  "80": {
+   "root": 79,
+   "shiftCents": 90.5,
+   "modes": 38,
+   "loopBands": 6,
+   "crossfadeMs": [
+    75.9,
+    94.9
+   ]
+  },
+  "81": {
+   "root": 79,
+   "shiftCents": 190.5,
+   "modes": 38,
+   "loopBands": 6,
+   "crossfadeMs": [
+    71.7,
+    89.6
+   ]
+  },
+  "82": {
+   "root": 84,
+   "shiftCents": -208.6,
+   "modes": 37,
+   "loopBands": 7,
+   "crossfadeMs": [
+    90.2,
+    112.8
+   ]
+  },
+  "83": {
+   "root": 84,
+   "shiftCents": -108.6,
+   "modes": 37,
+   "loopBands": 7,
+   "crossfadeMs": [
+    85.2,
+    106.5
+   ]
+  },
+  "84": {
+   "root": 84,
+   "shiftCents": -8.6,
+   "modes": 37,
+   "loopBands": 7,
+   "crossfadeMs": [
+    80.4,
+    100.5
+   ]
+  },
+  "85": {
+   "root": 84,
+   "shiftCents": 91.4,
+   "modes": 37,
+   "loopBands": 7,
+   "crossfadeMs": [
+    75.9,
+    94.9
+   ]
+  },
+  "86": {
+   "root": 84,
+   "shiftCents": 191.4,
+   "modes": 37,
+   "loopBands": 7,
+   "crossfadeMs": [
+    71.6,
+    89.5
+   ]
+  },
+  "87": {
+   "root": 89,
+   "shiftCents": -209.4,
+   "modes": 43,
+   "loopBands": 5,
+   "crossfadeMs": [
+    90.3,
+    112.9
+   ]
+  },
+  "88": {
+   "root": 89,
+   "shiftCents": -109.4,
+   "modes": 43,
+   "loopBands": 5,
+   "crossfadeMs": [
+    85.2,
+    106.5
+   ]
+  },
+  "89": {
+   "root": 89,
+   "shiftCents": -9.4,
+   "modes": 43,
+   "loopBands": 5,
+   "crossfadeMs": [
+    80.4,
+    100.5
+   ]
+  },
+  "90": {
+   "root": 89,
+   "shiftCents": 90.6,
+   "modes": 43,
+   "loopBands": 5,
+   "crossfadeMs": [
+    75.9,
+    94.9
+   ]
+  },
+  "91": {
+   "root": 89,
+   "shiftCents": 190.6,
+   "modes": 43,
+   "loopBands": 5,
+   "crossfadeMs": [
+    71.7,
+    89.6
+   ]
+  },
+  "92": {
+   "root": 94,
+   "shiftCents": -214.7,
+   "modes": 45,
+   "loopBands": 5,
+   "crossfadeMs": [
+    90.6,
+    113.2
+   ]
+  },
+  "93": {
+   "root": 94,
+   "shiftCents": -114.7,
+   "modes": 45,
+   "loopBands": 5,
+   "crossfadeMs": [
+    85.5,
+    106.8
+   ]
+  },
+  "94": {
+   "root": 94,
+   "shiftCents": -14.7,
+   "modes": 45,
+   "loopBands": 5,
+   "crossfadeMs": [
+    80.7,
+    100.9
+   ]
+  },
+  "95": {
+   "root": 94,
+   "shiftCents": 85.3,
+   "modes": 45,
+   "loopBands": 5,
+   "crossfadeMs": [
+    76.1,
+    95.2
+   ]
+  },
+  "96": {
+   "root": 94,
+   "shiftCents": 185.3,
+   "modes": 45,
+   "loopBands": 5,
+   "crossfadeMs": [
+    71.9,
+    89.8
+   ]
+  },
+  "97": {
+   "root": 99,
+   "shiftCents": -234.7,
+   "modes": 41,
+   "loopBands": 5,
+   "crossfadeMs": [
+    91.6,
+    114.5
+   ]
+  },
+  "98": {
+   "root": 99,
+   "shiftCents": -134.7,
+   "modes": 41,
+   "loopBands": 5,
+   "crossfadeMs": [
+    86.5,
+    108.1
+   ]
+  },
+  "99": {
+   "root": 99,
+   "shiftCents": -34.7,
+   "modes": 41,
+   "loopBands": 5,
+   "crossfadeMs": [
+    81.6,
+    102.0
+   ]
+  },
+  "100": {
+   "root": 99,
+   "shiftCents": 65.3,
+   "modes": 41,
+   "loopBands": 5,
+   "crossfadeMs": [
+    77.0,
+    96.3
+   ]
+  }
+ }
+}

@@ -1,0 +1,347 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-FileCopyrightText: 2026 Michi71
+#include "PluginProcessor.h"
+
+#include "BankLocator.h"
+#include "Parameters.h"
+#include "PluginEditor.h"
+
+#include <core/dsp.h>
+#include <core/params.h>
+
+namespace ids = tw::ids;
+
+PluginProcessor::PluginProcessor()
+    : AudioProcessor (BusesProperties().withOutput ("Output", juce::AudioChannelSet::stereo(), true)),
+      juce::Thread ("ToneWerk loader"),
+      apvts_ (*this, nullptr, "ToneWerk", tw::createParameterLayout()),
+      presets_ (apvts_)
+{
+    auto raw = [this] (const char* id) {
+        auto* p = apvts_.getRawParameterValue (id);
+        jassert (p != nullptr);
+        return p;
+    };
+    instrument_ = raw (ids::instrument);
+    volume_ = raw (ids::volume);
+    hardness_ = raw (ids::hardness);
+    decay_ = raw (ids::decay);
+    unison_ = raw (ids::unison);
+    stretch_ = raw (ids::stretch);
+    fxp_ = { raw (ids::fxOn), raw (ids::fxVolume), raw (ids::fxDrive), raw (ids::fxEnvelope), raw (ids::fxBass), raw (ids::fxMid),
+        raw (ids::fxMidFreq), raw (ids::fxTreble), raw (ids::panOn), raw (ids::panWave), raw (ids::panRate), raw (ids::panDepth),
+        raw (ids::compOn), raw (ids::compAmount), raw (ids::compMakeup), raw (ids::chorusOn), raw (ids::chorusRate),
+        raw (ids::chorusDepth), raw (ids::phaserOn), raw (ids::phaserRate), raw (ids::phaserDepth), raw (ids::delayOn),
+        raw (ids::delayTime), raw (ids::delayFeedback), raw (ids::delayMix), raw (ids::delayPingPong) };
+
+    // a fresh instance is the first factory preset (the parameter defaults)
+    apvts_.state.setProperty (tw::PresetManager::kNameProperty, presets_.factoryNames()[0], nullptr);
+    apvts_.state.setProperty ("presetFactory", true, nullptr);
+
+    // the delay lines are allocated for the longest time once
+    fx_.setDelayTime (4.0);
+    fx_.init (48000.0);
+    scratch_.setSize (3, kChunk);
+    startThread (juce::Thread::Priority::normal);
+}
+
+PluginProcessor::~PluginProcessor()
+{
+    stopThread (4000);
+    delete pending_.exchange (nullptr);
+    delete retired_.exchange (nullptr);
+}
+
+// --- loader thread ------------------------------------------------------------------------------------------------------
+
+tw::VoiceConfig PluginProcessor::wantedConfig() const
+{
+    tw::VoiceConfig c;
+    c.instrument = int (std::lround (instrument_->load()));
+    c.hardness = hardness_->load();
+    c.decay = decay_->load();
+    c.unison = unison_->load();
+    c.stretch = stretch_->load();
+    c.bankGeneration = bankGeneration_.load();
+    return c;
+}
+
+static int64_t signatureOf (const tw::VoiceConfig& c)
+{
+    auto h = int64_t (c.instrument) * 1000003 + int64_t (c.bankGeneration) * 7919;
+    for (float v : { c.hardness, c.decay, c.unison, c.stretch })
+        h = h * 31 + int64_t (std::lround (v * 100.0f));
+    return h;
+}
+
+int64_t PluginProcessor::wantedSignature() const { return signatureOf (wantedConfig()); }
+
+std::shared_ptr<tw::BankImage> PluginProcessor::bankFor (int slot, int generation)
+{
+    if (generation != bankCacheGeneration_)
+    {
+        bankCache_.clear();
+        bankCacheGeneration_ = generation;
+    }
+    for (auto& b : bankCache_)
+        if (b->slot == slot)
+            return b;
+    const auto file = tw::findBank (slot);
+    if (file == juce::File())
+        return nullptr;
+    auto bank = std::make_shared<tw::BankImage> (file, slot);
+    if (!bank->valid())
+        return nullptr;
+    bankCache_.push_front (bank);
+    while (bankCache_.size() > 2) // the playing voices keep their own reference
+        bankCache_.pop_back();
+    return bank;
+}
+
+void PluginProcessor::build (const tw::VoiceConfig& config)
+{
+    pmp::Params p;
+    p.loadPreset (tw::instrumentId (config.instrument).toStdString());
+    const int slot = int (std::lround (p.hybridBank));
+    auto bank = p.hybridOn > 0.5f ? bankFor (slot, config.bankGeneration) : nullptr;
+
+    auto voice = std::make_unique<tw::InstrumentVoice> (config, std::move (bank));
+    voice->prepare (hostRate_.load(), kChunk);
+    {
+        const juce::ScopedLock sl (statusLock_);
+        status_ = voice->status();
+    }
+    delete pending_.exchange (voice.release());
+}
+
+void PluginProcessor::run()
+{
+    tw::VoiceConfig built, last;
+    bool haveBuilt = false;
+    auto changedAt = juce::Time::getMillisecondCounter();
+    while (!threadShouldExit())
+    {
+        wait (25);
+        delete retired_.exchange (nullptr);
+
+        const auto want = wantedConfig();
+        const auto now = juce::Time::getMillisecondCounter();
+        if (!(want == last))
+        {
+            last = want;
+            changedAt = now;
+        }
+        const bool rebuild = rebuild_.exchange (false);
+        if (haveBuilt && want == built && !rebuild)
+            continue;
+        // an instrument switch at once; the voicing knobs once they rest for a moment (every change rebuilds the engine)
+        const bool switched = !haveBuilt || want.instrument != built.instrument || want.bankGeneration != built.bankGeneration;
+        if (!switched && !rebuild && now - changedAt < 250)
+            continue;
+        build (want);
+        built = want;
+        haveBuilt = true;
+    }
+}
+
+juce::String PluginProcessor::instrumentStatus() const
+{
+    const juce::ScopedLock sl (statusLock_);
+    return status_;
+}
+
+// --- audio thread -------------------------------------------------------------------------------------------------------
+
+void PluginProcessor::prepareToPlay (double sampleRate, int)
+{
+    hostRate_.store (sampleRate);
+    fx_.setDelayTime (4.0);
+    fx_.init (sampleRate);
+    fxWasOn_ = false;
+    gain_.reset (sampleRate, 0.02);
+    gain_.setCurrentAndTargetValue (juce::Decibels::decibelsToGain (volume_->load(), -48.0f));
+    fadeStep_ = float (1.0 / (kFadeMs * 1e-3 * sampleRate));
+    fading_.reset(); // not real time here
+    if (active_ && !juce::exactlyEqual (active_->hostRate(), sampleRate))
+        active_->prepare (sampleRate, kChunk);
+    if (auto* p = pending_.load(); p != nullptr && !juce::exactlyEqual (p->hostRate(), sampleRate))
+        rebuild_.store (true); // adoptPending() refuses it, the loader builds one for this rate
+}
+
+void PluginProcessor::releaseResources() {}
+
+bool PluginProcessor::isBusesLayoutSupported (const BusesLayout& layouts) const
+{
+    const auto out = layouts.getMainOutputChannelSet();
+    return (out == juce::AudioChannelSet::mono() || out == juce::AudioChannelSet::stereo()) && layouts.getMainInputChannels() == 0;
+}
+
+void PluginProcessor::retire (std::unique_ptr<tw::InstrumentVoice>& voice)
+{
+    tw::InstrumentVoice* expected = nullptr;
+    if (retired_.compare_exchange_strong (expected, voice.get()))
+        voice.release();
+}
+
+void PluginProcessor::adoptPending()
+{
+    if (fading_ != nullptr || pending_.load() == nullptr)
+        return; // one switch at a time: the previous fade is still running or not collected yet
+    std::unique_ptr<tw::InstrumentVoice> next (pending_.exchange (nullptr));
+    if (next == nullptr)
+        return;
+    if (!juce::exactlyEqual (next->hostRate(), hostRate_.load()))
+    {
+        retire (next);
+        if (next != nullptr) // the retire slot is busy: try again next block
+            pending_.store (next.release());
+        rebuild_.store (true);
+        return;
+    }
+    next->controller (64, sustain_);
+    fading_ = std::move (active_);
+    fadeGain_ = 1.0f;
+    active_ = std::move (next);
+    readyGeneration_.store (signatureOf (active_->config()));
+}
+
+void PluginProcessor::handleMidi (const juce::MidiMessage& m)
+{
+    if (m.isController() && m.getControllerNumber() == 64)
+        sustain_ = m.getControllerValue();
+    if (active_ == nullptr)
+        return;
+    if (m.isNoteOn())
+        active_->noteOn (m.getNoteNumber(), m.getVelocity());
+    else if (m.isNoteOff())
+        active_->noteOff (m.getNoteNumber());
+    else if (m.isAllNotesOff())
+        active_->allNotesOff();
+    else if (m.isController())
+        active_->controller (m.getControllerNumber(), m.getControllerValue());
+}
+
+void PluginProcessor::renderSegment (float* left, float* right, int n)
+{
+    if (active_ != nullptr)
+        active_->render (left, right, n);
+    else
+    {
+        juce::FloatVectorOperations::clear (left, n);
+        juce::FloatVectorOperations::clear (right, n);
+    }
+    if (fading_ == nullptr)
+        return;
+    float* fl = scratch_.getWritePointer (0);
+    float* fr = scratch_.getWritePointer (1);
+    fading_->render (fl, fr, n);
+    for (int i = 0; i < n; ++i)
+    {
+        left[i] += fadeGain_ * fl[i];
+        right[i] += fadeGain_ * fr[i];
+        fadeGain_ = juce::jmax (0.0f, fadeGain_ - fadeStep_);
+    }
+    if (fadeGain_ <= 0.0f)
+        retire (fading_); // stays (silent) when the loader has not collected the previous one yet
+}
+
+void PluginProcessor::updateEffects()
+{
+    auto on = [] (std::atomic<float>* p) { return p->load() > 0.5f; };
+    fx_.setVolume (fxp_.volume->load());
+    fx_.setDrive (fxp_.drive->load());
+    fx_.setEnvelope (fxp_.envelope->load());
+    fx_.setBass (fxp_.bass->load());
+    fx_.setMiddle (fxp_.mid->load());
+    fx_.setMiddleFreq (fxp_.midFreq->load());
+    fx_.setTreble (fxp_.treble->load());
+    fx_.setPanOn (on (fxp_.panOn));
+    fx_.setPanWave (int (std::lround (fxp_.panWave->load())));
+    fx_.setPanRate (fxp_.panRate->load());
+    fx_.setPanDepth (fxp_.panDepth->load());
+    fx_.setCompressorOn (on (fxp_.compOn));
+    fx_.setCompAmount (fxp_.compAmount->load());
+    fx_.setCompMakeup (fxp_.compMakeup->load());
+    fx_.setChorusOn (on (fxp_.chorusOn));
+    fx_.setChorusRate (fxp_.chorusRate->load());
+    fx_.setChorusDepth (fxp_.chorusDepth->load());
+    fx_.setPhaserOn (on (fxp_.phaserOn));
+    fx_.setPhaserRate (fxp_.phaserRate->load());
+    fx_.setPhaserDepth (fxp_.phaserDepth->load());
+    fx_.setDelayOn (on (fxp_.delayOn));
+    fx_.setDelayTime (fxp_.delayTime->load());
+    fx_.setDelayFeedback (fxp_.delayFeedback->load());
+    fx_.setDelayMix (fxp_.delayMix->load());
+    fx_.setDelayPingPong (on (fxp_.delayPingPong));
+}
+
+void PluginProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midi)
+{
+    juce::ScopedNoDenormals noDenormals;
+    const int n = buffer.getNumSamples();
+    keyboardState_.processNextMidiBuffer (midi, 0, n, true);
+    adoptPending();
+
+    const bool mono = buffer.getNumChannels() == 1;
+    float* left = buffer.getWritePointer (0);
+    float* right = mono ? nullptr : buffer.getWritePointer (1);
+    auto it = midi.begin();
+    int pos = 0;
+    while (pos < n)
+    {
+        for (; it != midi.end() && (*it).samplePosition <= pos; ++it)
+            handleMidi ((*it).getMessage());
+        const int next = juce::jmin (it != midi.end() ? juce::jmax (pos + 1, (*it).samplePosition) : n, n, pos + kChunk);
+        float* r = mono ? scratch_.getWritePointer (2) : right + pos;
+        renderSegment (left + pos, r, next - pos);
+        if (mono)
+            for (int i = 0; i < next - pos; ++i)
+                left[pos + i] = 0.5f * (left[pos + i] + r[i]);
+        pos = next;
+    }
+    for (; it != midi.end(); ++it)
+        handleMidi ((*it).getMessage());
+
+    // the MK8 effect chain at the host rate (stereo only)
+    const bool fxOn = fxp_.on->load() > 0.5f && buffer.getNumChannels() > 1;
+    if (fxOn)
+    {
+        if (!fxWasOn_)
+            fx_.reset();
+        updateEffects();
+        for (int done = 0; done < n; done += kChunk)
+            fx_.process (left + done, right + done, juce::jmin (kChunk, n - done));
+    }
+    fxWasOn_ = fxOn;
+
+    gain_.setTargetValue (juce::Decibels::decibelsToGain (volume_->load(), -48.0f));
+    for (int ch = 0; ch < juce::jmin (2, buffer.getNumChannels()); ++ch)
+    {
+        auto g = gain_;
+        float* d = buffer.getWritePointer (ch);
+        for (int i = 0; i < n; ++i)
+            d[i] = pmp::softClip (g.getNextValue() * d[i]);
+        if (ch == juce::jmin (2, buffer.getNumChannels()) - 1)
+            gain_ = g;
+    }
+    for (int ch = 2; ch < buffer.getNumChannels(); ++ch)
+        buffer.clear (ch, 0, n);
+}
+
+// --- state ---------------------------------------------------------------------------------------------------------------
+
+void PluginProcessor::getStateInformation (juce::MemoryBlock& destData)
+{
+    if (const auto xml = apvts_.copyState().createXml())
+        copyXmlToBinary (*xml, destData);
+}
+
+void PluginProcessor::setStateInformation (const void* data, int sizeInBytes)
+{
+    if (const auto xml = getXmlFromBinary (data, sizeInBytes); xml != nullptr && xml->hasTagName (apvts_.state.getType()))
+        apvts_.replaceState (juce::ValueTree::fromXml (*xml));
+}
+
+juce::AudioProcessorEditor* PluginProcessor::createEditor() { return new PluginEditor (*this); }
+
+juce::AudioProcessor* JUCE_CALLTYPE createPluginFilter() { return new PluginProcessor(); }
