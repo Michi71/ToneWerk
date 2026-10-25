@@ -69,8 +69,11 @@ CP80 have none and stay silent. The status line below the instrument choice tell
 
 ## How it works
 
-- The engine runs at **the rate of its bank** (44.1 kHz, the SGP grand 48 kHz; the physical model without a bank 48 kHz). A
-  windowed-sinc interpolator per channel converts to the host rate; at equal rates it is bypassed.
+- The engine runs at **the rate of its bank** (44.1 kHz, the SGP grand 48 kHz; the physical model without a bank 48 kHz). A short
+  Kaiser-windowed sinc resampler (`source/Resampler.*`, 48 taps) converts to the host rate; at equal rates it is bypassed. Its only
+  delay is the lookahead of 24 input samples (0.54 ms at 44.1 kHz); passband flat to ±0.03 dB up to 18 kHz, 83–97 dB
+  signal-to-noise (`tests/ResamplerTests.cpp`). `./Builds/Tests "[.latency]"` measures the time from note-on to the attack for
+  every instrument.
 - A loader thread builds instruments (reads the bank, prepares the engine) and hands them over through an atomic pointer; the
   audio thread adopts them, fades the old one out and hands it back for deletion. Nothing is allocated or freed on the audio thread.
 - The effect chain (`pmp::Mk8Effects`) runs in the plugin at the host rate; the engine itself runs with `fx.on=0` and without
