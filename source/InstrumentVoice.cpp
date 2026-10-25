@@ -35,6 +35,17 @@ BankImage::~BankImage()
         pmp::alignedFree (data);
 }
 
+// Level balance of the instruments in the plugin: at C4 velocity 100 the clavinet and the Pianet played 5 and 6.5 dB louder
+// than the others (RMS -17.5 and -16.1 dBFS against -22 ... -24), and the clavinet's chords ran into the soft clip
+float outputTrimDb (const juce::String& instrument)
+{
+    if (instrument == "clav6")
+        return -5.0f;
+    if (instrument == "pianet")
+        return -6.5f;
+    return 0.0f;
+}
+
 InstrumentVoice::InstrumentVoice (const VoiceConfig& config, std::shared_ptr<BankImage> bank)
     : config_ (config), bank_ (std::move (bank))
 {
@@ -47,6 +58,7 @@ InstrumentVoice::InstrumentVoice (const VoiceConfig& config, std::shared_ptr<Ban
     p.voicing.stretch = config.stretch;
     p.fxOn = 0.0f;     // the effect chain runs in the plugin at the host rate
     p.softClip = 0.0f; // so does the soft clip, behind it
+    p.masterGain *= float (juce::Decibels::decibelsToGain (outputTrimDb (id)));
 
     const bool wantsBank = p.hybridOn > 0.5f;
     const int slot = int (std::lround (p.hybridBank));

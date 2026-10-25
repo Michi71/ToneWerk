@@ -163,6 +163,7 @@ void PluginProcessor::prepareToPlay (double sampleRate, int)
     fxGain_ = 0.0f;
     reverb_.prepare (sampleRate);
     reverbGain_ = 0.0f;
+    limiter_.prepare (sampleRate);
     switchStep_ = float (1.0 / (kSwitchMs * 1e-3 * sampleRate));
     gain_.reset (sampleRate, 0.02);
     gain_.setCurrentAndTargetValue (juce::Decibels::decibelsToGain (volume_->load(), -48.0f));
@@ -364,15 +365,21 @@ void PluginProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::Midi
                 l[i] = 0.5f * (l[i] + r[i]);
     }
 
+    // volume, the limiter, the soft clip as the last safeguard
     gain_.setTargetValue (juce::Decibels::decibelsToGain (volume_->load(), -48.0f));
-    for (int ch = 0; ch < juce::jmin (2, buffer.getNumChannels()); ++ch)
+    for (int i = 0; i < n; ++i)
     {
-        auto g = gain_;
-        float* d = buffer.getWritePointer (ch);
-        for (int i = 0; i < n; ++i)
-            d[i] = pmp::softClip (g.getNextValue() * d[i]);
-        if (ch == juce::jmin (2, buffer.getNumChannels()) - 1)
-            gain_ = g;
+        const float g = gain_.getNextValue();
+        left[i] *= g;
+        if (!mono)
+            right[i] *= g;
+    }
+    limiter_.process (left, mono ? nullptr : right, n);
+    for (int i = 0; i < n; ++i)
+    {
+        left[i] = pmp::softClip (left[i]);
+        if (!mono)
+            right[i] = pmp::softClip (right[i]);
     }
     for (int ch = 2; ch < buffer.getNumChannels(); ++ch)
         buffer.clear (ch, 0, n);
