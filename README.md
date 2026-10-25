@@ -61,6 +61,11 @@ CP80 have none and stay silent. The status line below the instrument choice tell
 - **Volume** (−48 … +12 dB) after the effect chain, followed by a peak limiter (attack 0.1 ms, release 120 ms, no lookahead)
   and the engine's soft clip as the last safeguard: full chords are turned down instead of distorted. The clavinet and the
   Pianet are trimmed by −5 and −6.5 dB to the level of the other instruments.
+- **Humanize** (0–100 %, default 50 %): every strike scatters a little, so no two notes are bit for bit the same. The velocity
+  is multiplied by a random factor exp(σ g); 50 % is the physical presets' hammer-speed scatter (`human.speed` 0.05) carried
+  over to the velocity (σ 0.038 of ln velocity), 100 % twice that. Level and, through the layer blend, timbre move: at 100 %
+  the level of repeated strikes scatters by about 1 dB. Applies to every instrument; the physical model is built without its
+  own speed scatter. At 0 % the hybrid voices repeat a strike bit for bit (at the bank's rate).
 - **Voicing** on the poles and layers of the bank (pmpiano README "Voicing"): hardness, decay, unison, stretch. Every change
   rebuilds the instrument (after 250 ms without further changes); sounding notes stop. The settings stay when the instrument
   changes, and extremes carry over (hardness −200 takes up to 6 dB off the highs, decay +300 lets chords build up into the soft

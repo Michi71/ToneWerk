@@ -75,7 +75,7 @@ private:
     juce::ComboBox instrumentBox_;
     std::unique_ptr<juce::AudioProcessorValueTreeState::ComboBoxAttachment> instrumentAttachment_;
     juce::Label status_;
-    std::unique_ptr<tw::Knob> volume_, hardness_, decay_, unison_, stretch_;
+    std::unique_ptr<tw::Knob> volume_, humanize_, hardness_, decay_, unison_, stretch_;
     juce::Rectangle<int> instrumentPanel_, voicingTitle_;
     juce::TextButton resetVoicing_ { "Reset" };
 

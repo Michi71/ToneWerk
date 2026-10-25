@@ -52,6 +52,8 @@ namespace ids
     inline constexpr const char* reverbDamping = "reverb_damping";
     inline constexpr const char* reverbPredelay = "reverb_predelay";
     inline constexpr const char* reverbWidth = "reverb_width";
+    // strike variation: every note-on's velocity scatters a little (Humanize.h)
+    inline constexpr const char* humanize = "humanize";
 } // namespace ids
 
 // the instruments are the presets of the engine (pmp::Params::presetId)

@@ -200,11 +200,12 @@ PluginEditor::PluginEditor (PluginProcessor& p)
     status_.setMinimumHorizontalScale (0.8f);
     addAndMakeVisible (status_);
     volume_ = std::make_unique<tw::Knob> (state, ids::volume, "Volume");
+    humanize_ = std::make_unique<tw::Knob> (state, ids::humanize, "Humanize");
     hardness_ = std::make_unique<tw::Knob> (state, ids::hardness, "Hardness");
     decay_ = std::make_unique<tw::Knob> (state, ids::decay, "Decay");
     unison_ = std::make_unique<tw::Knob> (state, ids::unison, "Unison");
     stretch_ = std::make_unique<tw::Knob> (state, ids::stretch, "Stretch");
-    for (auto* k : { volume_.get(), hardness_.get(), decay_.get(), unison_.get(), stretch_.get() })
+    for (auto* k : { volume_.get(), humanize_.get(), hardness_.get(), decay_.get(), unison_.get(), stretch_.get() })
         addAndMakeVisible (*k);
     resetVoicing_.setTooltip ("Reset the voicing to the instrument as calibrated (all controls 0)");
     resetVoicing_.onClick = [this] { resetVoicing(); };
@@ -354,7 +355,8 @@ void PluginEditor::resized()
     status_.setBounds (ip.removeFromTop (36));
     ip.removeFromBottom (10);
     auto vol = ip.removeFromTop (juce::jmin (130, ip.getHeight() / 3));
-    volume_->setBounds (vol.withSizeKeepingCentre (juce::jmin (120, vol.getWidth()), vol.getHeight()));
+    volume_->setBounds (vol.removeFromLeft (vol.getWidth() / 2));
+    humanize_->setBounds (vol);
     ip.removeFromTop (8);
     voicingTitle_ = ip.removeFromTop (26);
     resetVoicing_.setBounds (voicingTitle_.withLeft (voicingTitle_.getRight() - 58).reduced (0, 3));

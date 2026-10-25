@@ -14,6 +14,7 @@
 #include <core/mk8_fx.h>
 
 #include "InstrumentVoice.h"
+#include "Humanize.h"
 #include "Limiter.h"
 #include "PresetManager.h"
 #include "Reverb.h"
@@ -59,6 +60,8 @@ public:
     juce::String instrumentStatus() const;
     // the bank folder changed: reload the instrument from it
     void reloadBanks() { bankGeneration_.fetch_add (1); }
+    // the strike variation's random sequence, for repeatable tests
+    void seedHumanize (uint64_t seed) { humanize_.seed (seed); }
     // true when the voice built for the current parameters plays (tests; the audio thread adopts it in processBlock)
     bool instrumentReady() const { return readyGeneration_.load() == wantedSignature(); }
 
@@ -90,6 +93,7 @@ private:
     std::atomic<float>* decay_ = nullptr;
     std::atomic<float>* unison_ = nullptr;
     std::atomic<float>* stretch_ = nullptr;
+    std::atomic<float>* humanizeAmount_ = nullptr;
     struct FxParams
     {
         std::atomic<float>*on, *volume, *drive, *envelope, *bass, *mid, *midFreq, *treble, *panOn, *panWave, *panRate, *panDepth,
@@ -122,6 +126,7 @@ private:
     pmp::Mk8Effects fx_;
     tw::Reverb reverb_;
     tw::Limiter limiter_;
+    tw::Humanize humanize_ { uint64_t (juce::Time::getHighResolutionTicks()) };
     float fxGain_ = 0.0f, reverbGain_ = 0.0f, switchStep_ = 0.001f; // cross-fades of the stage switches
     juce::SmoothedValue<float> gain_ { 1.0f };
     juce::AudioBuffer<float> scratch_; // fading voice (0, 1), right channel of a mono output (2), a stage fading in or out (3, 4)
