@@ -81,6 +81,7 @@ private:
     juce::ToggleButton fxOn_;
     std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> fxOnAttachment_;
     std::vector<std::unique_ptr<tw::Section>> fxSections_;
+    static constexpr size_t kReverbSection = 7; // the last section: not dimmed by the FX switch
 
     juce::MidiKeyboardComponent keyboard_;
     std::unique_ptr<juce::FileChooser> chooser_;

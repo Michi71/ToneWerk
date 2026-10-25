@@ -15,6 +15,7 @@
 
 #include "InstrumentVoice.h"
 #include "PresetManager.h"
+#include "Reverb.h"
 
 #include <atomic>
 #include <deque>
@@ -38,7 +39,7 @@ public:
     bool acceptsMidi() const override { return true; }
     bool producesMidi() const override { return false; }
     bool isMidiEffect() const override { return false; }
-    double getTailLengthSeconds() const override { return 4.0; }
+    double getTailLengthSeconds() const override { return 10.0; } // the longest reverb
 
     int getNumPrograms() override { return 1; }
     int getCurrentProgram() override { return 0; }
@@ -93,6 +94,10 @@ private:
             *compOn, *compAmount, *compMakeup, *chorusOn, *chorusRate, *chorusDepth, *phaserOn, *phaserRate, *phaserDepth,
             *delayOn, *delayTime, *delayFeedback, *delayMix, *delayPingPong;
     } fxp_ {};
+    struct ReverbParams
+    {
+        std::atomic<float>*on, *mix, *size, *decay, *damping, *predelay, *width;
+    } rvp_ {};
 
     // loader <-> audio thread
     std::atomic<tw::InstrumentVoice*> pending_ { nullptr };
@@ -114,6 +119,8 @@ private:
     int sustain_ = 0;
     pmp::Mk8Effects fx_;
     bool fxWasOn_ = false;
+    tw::Reverb reverb_;
+    bool reverbWasOn_ = false;
     juce::SmoothedValue<float> gain_ { 1.0f };
     juce::AudioBuffer<float> scratch_; // fading voice (2 channels) and the right channel of a mono output
 
