@@ -17,6 +17,9 @@ set(COMPANY_NAME "Michi71")
 set(BUNDLE_ID "de.michi71.tonewerk")
 set(FORMATS Standalone AU VST3)
 
+# link-time optimisation of the plugin code; the CI turns it off except for releases (the LTO links take most of its build time)
+option(TONEWERK_LTO "Link-time optimisation of the plugin binaries" ON)
+
 set(CMAKE_POLICY_DEFAULT_CMP0141 NEW CACHE STRING "" FORCE)
 set(CMAKE_MSVC_DEBUG_INFORMATION_FORMAT Embedded CACHE STRING "" FORCE)
 
@@ -83,8 +86,10 @@ target_link_libraries(SharedCode
     juce_gui_basics
     juce_gui_extra
     juce::juce_recommended_config_flags
-    juce::juce_recommended_lto_flags
     juce::juce_recommended_warning_flags)
+if(TONEWERK_LTO)
+  target_link_libraries(SharedCode INTERFACE juce::juce_recommended_lto_flags)
+endif()
 
 target_link_libraries("${PROJECT_NAME}" PRIVATE SharedCode)
 

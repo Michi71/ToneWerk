@@ -81,7 +81,9 @@ jobs:
         uses: mozilla-actions/sccache-action@v0.0.9
 
       - name: Configure
-        run: cmake -B ${{ env.BUILD_DIR }} -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} -DCMAKE_C_COMPILER_LAUNCHER=sccache -DCMAKE_CXX_COMPILER_LAUNCHER=sccache ${{ matrix.extra-flags }} .
+        # LTO only for releases: the compiles come from the sccache (94 % hits), the LTO links of the four binaries took 2-6 of the
+        # 3-7 minutes of a build and cannot be cached
+        run: cmake -B ${{ env.BUILD_DIR }} -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} -DTONEWERK_LTO=${{ startsWith(github.ref, 'refs/tags/v') && 'ON' || 'OFF' }} -DCMAKE_C_COMPILER_LAUNCHER=sccache -DCMAKE_CXX_COMPILER_LAUNCHER=sccache ${{ matrix.extra-flags }} .
 
       - name: Build
         run: cmake --build ${{ env.BUILD_DIR }} --config ${{ env.BUILD_TYPE }}

@@ -15,6 +15,7 @@
 #include "Resampler.h"
 
 #include <array>
+#include <atomic>
 #include <memory>
 
 namespace tw
@@ -82,6 +83,8 @@ public:
     const VoiceConfig& config() const { return config_; }
     double engineRate() const { return engineRate_; }
     bool silent() const { return engine_ == nullptr; } // the engine refused the preset (status says why)
+    // the engine produced a non-finite sample; the voice stays silent from then on (audio thread; read anywhere)
+    bool failed() const { return failed_.load (std::memory_order_relaxed); }
     const juce::String& status() const { return status_; }
     int lowestKey() const { return engine_ ? engine_->lowestKey() : 0; }
     int highestKey() const { return engine_ ? engine_->highestKey() : 127; }
@@ -95,5 +98,8 @@ private:
 
     Resampler resampler_;
     bool resample_ = false;
+    std::atomic<bool> failed_ { false };
+
+    bool finite (const float* x, int n) const;
 };
 } // namespace tw

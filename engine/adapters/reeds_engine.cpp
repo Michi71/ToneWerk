@@ -5,6 +5,8 @@
 
 #include <core/engine.h>
 
+#include <algorithm>
+
 #include <cmath>
 
 namespace tw::engines
@@ -52,6 +54,11 @@ std::unique_ptr<SoundEngine> createReedsEngine (const Setup& setup, std::string*
     p.voicing.damperRelease = v.damperRelease;
     if (!setup.strikeScatter)
         p.humanSpeed = 0.0f;
+    // A harder or heavier hammer on a thinner reed stiffens the contact beyond what the engine's two sub-steps per sample
+    // integrate: combined extremes (hardness +200, mass +200, gauge -50) ran away to inf. Sixteen keep every corner of the
+    // voicing ranges stable (tests "Random voicing combinations"); neutral and softer voicings keep the calibrated two.
+    if (v.hardness > 0.0f || v.hammerMass > 0.0f || v.gauge < 0.0f)
+        p.hammerSubsteps = std::max (p.hammerSubsteps, 16.0f);
     p.trimDb += float (setup.trimDb);
     return std::make_unique<ReedsEngine> (p);
 }

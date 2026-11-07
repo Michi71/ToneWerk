@@ -51,10 +51,21 @@ void InstrumentVoice::prepare (double hostRate, int maxFrames)
     }
 }
 
+bool InstrumentVoice::finite (const float* x, int n) const
+{
+    float sum = 0.0f;
+    for (int i = 0; i < n; ++i)
+        sum += x[i] * 0.0f; // NaN or inf times 0 is NaN
+    return sum == sum;
+}
+
+// A non-finite sample must never reach the effect chain and the host (it breaks the delay and the limiter for good, and a
+// host may crash on it): the voice falls silent instead. The voicing guards (adapters) keep the engines finite; this is the
+// last line.
 void InstrumentVoice::render (float* left, float* right, int n)
 {
     jassert (n <= maxFrames_);
-    if (engine_ == nullptr)
+    if (engine_ == nullptr || failed())
     {
         juce::FloatVectorOperations::clear (left, n);
         juce::FloatVectorOperations::clear (right, n);
@@ -63,13 +74,26 @@ void InstrumentVoice::render (float* left, float* right, int n)
     if (!resample_)
     {
         engine_->process (left, n);
+        if (!finite (left, n))
+        {
+            failed_.store (true);
+            juce::FloatVectorOperations::clear (left, n);
+        }
         juce::FloatVectorOperations::copy (right, left, n);
         return;
     }
     if (const int m = resampler_.inputNeeded (n); m > 0)
     {
-        engine_->process (resampler_.writeLeft(), m);
-        juce::FloatVectorOperations::copy (resampler_.writeRight(), resampler_.writeLeft(), m);
+        float* in = resampler_.writeLeft();
+        engine_->process (in, m);
+        if (!finite (in, m))
+        {
+            failed_.store (true);
+            juce::FloatVectorOperations::clear (left, n);
+            juce::FloatVectorOperations::clear (right, n);
+            return;
+        }
+        juce::FloatVectorOperations::copy (resampler_.writeRight(), in, m);
         resampler_.appended (m);
     }
     resampler_.process (left, right, n);

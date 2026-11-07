@@ -2,6 +2,7 @@
 // SPDX-FileCopyrightText: 2026 Michi71
 #include "helpers/test_helpers.h"
 
+#include <InstrumentVoice.h>
 #include <Parameters.h>
 #include <PluginProcessor.h>
 #include <PresetManager.h>
@@ -548,4 +549,57 @@ TEST_CASE ("Loud chords stay out of the soft clip", "[audio][levels]")
         CHECK (c4 < 0.01); // before the limiter and the level trims: up to 0.7 % (clavinet)
         CHECK (c8 < 0.5);  // before: 1.5-13.7 %
     }
+}
+
+// random combinations of every voicing control over its whole range, as a host's automation sets them: every instrument builds
+// and plays finite (pluginval's editor automation crashed on Linux)
+TEST_CASE ("Random voicing combinations build and play", "[audio][voicing]")
+{
+    juce::Random random (20261107);
+    PluginProcessor plugin; // the parameter ranges
+    for (int i = 0; i < instrumentCount(); ++i)
+        for (int round = 0; round < 12; ++round)
+        {
+            tw::VoiceConfig config;
+            config.instrument = i;
+            auto value = [&] (const char* id) {
+                auto* p = dynamic_cast<juce::RangedAudioParameter*> (plugin.state().getParameter (id));
+                const float extreme = random.nextBool() ? 0.0f : 1.0f;
+                return p->convertFrom0to1 (round % 2 == 0 ? random.nextFloat() : extreme);
+            };
+            auto& v = config.voicing;
+            v.hardness = value (tw::ids::hardness);
+            v.decay = value (tw::ids::decay);
+            v.unison = value (tw::ids::unison);
+            v.stretch = value (tw::ids::stretch);
+            v.hammerMass = value (tw::ids::hammerMass);
+            v.strikePoint = value (tw::ids::strikePoint);
+            v.gauge = value (tw::ids::gauge);
+            v.pickupGap = value (tw::ids::pickupGap);
+            v.pickupOffset = value (tw::ids::pickupOffset);
+            v.tonebarDetune = value (tw::ids::tonebarDetune);
+            v.damperRelease = value (tw::ids::damperRelease);
+            INFO (tw::instrumentId (i) << " round " << round << ": hardness " << v.hardness << " mass " << v.hammerMass << " strike "
+                                       << v.strikePoint << " gauge " << v.gauge << " gap " << v.pickupGap << " offset " << v.pickupOffset
+                                       << " tonebar " << v.tonebarDetune << " damper " << v.damperRelease << " decay " << v.decay
+                                       << " unison " << v.unison << " stretch " << v.stretch);
+            tw::InstrumentVoice voice (config);
+            voice.prepare (48000.0, 512);
+            REQUIRE (!voice.silent());
+            std::vector<float> l (512), r (512);
+            double sum = 0.0;
+            for (int b = 0; b < 40; ++b)
+            {
+                if (b == 0)
+                    for (const int note : { 30, 45, 60, 72, 88 })
+                        voice.noteOn (note, 127);
+                if (b == 20)
+                    voice.allNotesOff();
+                voice.render (l.data(), r.data(), 512);
+                for (const float x : l)
+                    sum += double (x) * x;
+            }
+            CHECK (std::isfinite (sum));
+            CHECK (!voice.failed());
+        }
 }

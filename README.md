@@ -33,7 +33,10 @@ JUCE dependencies (`libasound2-dev libjack-jackd2-dev libx11-dev libxinerama-dev
 libfreetype6-dev libfontconfig1-dev`). The results are in `Builds/ToneWerk_artefacts/Release/`; on the Mac the build copies
 VST3, AU and CLAP to `~/Library/Audio/Plug-Ins/`.
 
-CMake option `TONEWERK_FLOAT` (off): the engines compute in single precision (`PMP_FLOAT`).
+CMake options:
+
+- `TONEWERK_FLOAT` (off): the engines compute in single precision (`PMP_FLOAT`).
+- `TONEWERK_LTO` (on): link-time optimisation of the plugin binaries. The CI turns it off except for releases.
 
 ## Instruments
 
@@ -62,7 +65,8 @@ compiled into it. The engines render mono; the effect chain and the reverb make 
 - **Voicing**: the controls of the instrument's engine on top of its calibration. The physical models take the technician's
   controls (hardness, hammer mass, strike point, tine or reed gauge, pickup gap and offset, the Rhodes' tonebar, damper), the
   hybrid voices hardness, decay, unison and stretch on their poles ([docs/INSTRUMENTS.md](docs/INSTRUMENTS.md)). Every change
-  rebuilds the instrument (after 250 ms without further changes); sounding notes stop. The settings stay when the instrument
+  rebuilds the instrument (after 250 ms without further changes); sounding notes stop. A harder or heavier hammer or a thinner
+  tine or reed integrates the hammer contact with 16 sub-steps instead of 2: combined extremes ran away otherwise. The settings stay when the instrument
   changes, and extremes carry over: **Reset** sets every control back to the instrument as calibrated.
 - **Effects**: the MK8 chain in the units of the Rhodes V8 Pro – preamp (drive, envelope, level), equalizer, Vari-Pan,
   compressor, chorus, phaser, delay. The **FX** switch bypasses the whole chain; like the reverb switch it cross-fades over
@@ -101,7 +105,8 @@ compiled into it. The engines render mono; the effect chain and the reverb make 
 ## CI
 
 `.github/workflows/build.yml` builds and tests on macOS (universal), Linux and Windows, validates the VST3 with pluginval
-(strictness 10) and uploads one zip per platform. A `v*` tag creates a release with the three zips. The builds
+(strictness 10) and uploads one zip per platform. The compiles come from sccache (GitHub's cache); link-time optimisation, whose
+links cannot be cached and took most of a build, is on only for a `v*` tag, which creates a release with the three zips. The builds
 are not signed: macOS reports them as unidentified (`xattr -dr com.apple.quarantine <plugin>`), Windows SmartScreen likewise.
 
 ## Licence
