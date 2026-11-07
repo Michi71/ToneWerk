@@ -15,6 +15,7 @@ InstrumentVoice::InstrumentVoice (const VoiceConfig& config) : config_ (config)
     setup.preset = inst.preset;
     setup.voicing = config.voicing;
     setup.trimDb = inst.trimDb;
+    setup.maxVoices = config.maxVoices;
     setup.strikeScatter = false; // the strike variation is the plugin's Humanize, for every instrument
     std::string err;
     engine_ = engines::createEngine (inst.family, setup, &err);

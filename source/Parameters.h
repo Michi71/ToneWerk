@@ -64,6 +64,8 @@ namespace ids
     inline constexpr const char* reverbWidth = "reverb_width";
     // strike variation: every note-on's velocity scatters a little (Humanize.h)
     inline constexpr const char* humanize = "humanize";
+    // polyphony limit for slower computers: over it a new key makes the quietest voice fade out (a rebuild of the instrument)
+    inline constexpr const char* polyphony = "polyphony";
 } // namespace ids
 
 // The instruments: presets of the three sound engines. The index is the value of the instrument parameter (saved in projects
@@ -80,6 +82,10 @@ const Instrument& instrument (int index); // clamped to the table
 int instrumentIndex (const juce::String& preset); // -1 if unknown
 juce::StringArray instrumentNames();
 juce::String instrumentId (int index);
+
+// the choices of the polyphony parameter and the voice limit of each (0: every key)
+const juce::StringArray& polyphonyChoices();
+int polyphonyVoices (int choice);
 
 // the voicing controls of a family, in the order of the panel
 const juce::StringArray& voicingIds (engines::Family family);

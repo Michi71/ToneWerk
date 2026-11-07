@@ -164,6 +164,7 @@ private:
     std::unique_ptr<juce::AudioProcessorValueTreeState::ComboBoxAttachment> instrumentAttachment_;
     juce::Label status_;
     std::unique_ptr<tw::Knob> volume_, humanize_;
+    std::unique_ptr<juce::Component> polyphony_;
     std::map<juce::String, std::unique_ptr<tw::Knob>> voicing_; // every voicing control; the family's are shown
     juce::StringArray shownVoicing_;
     int shownFamily_ = -1;

@@ -267,6 +267,8 @@ PluginEditor::PluginEditor (PluginProcessor& p)
     addAndMakeVisible (status_);
     volume_ = std::make_unique<tw::Knob> (state, ids::volume, "Volume");
     humanize_ = std::make_unique<tw::Knob> (state, ids::humanize, "Humanize");
+    polyphony_ = std::make_unique<ChoiceBox> (state, ids::polyphony, "Voices");
+    addAndMakeVisible (*polyphony_);
     for (auto* k : { volume_.get(), humanize_.get() })
         addAndMakeVisible (*k);
     for (const auto& id : tw::allVoicingIds())
@@ -424,8 +426,10 @@ void PluginEditor::resized()
     status_.setBounds (ip.removeFromTop (36));
     ip.removeFromBottom (10);
     auto vol = ip.removeFromTop (juce::jmin (130, ip.getHeight() / 3));
-    volume_->setBounds (vol.removeFromLeft (vol.getWidth() / 2));
-    humanize_->setBounds (vol);
+    const int third = vol.getWidth() / 3;
+    volume_->setBounds (vol.removeFromLeft (third));
+    humanize_->setBounds (vol.removeFromLeft (third));
+    polyphony_->setBounds (vol.withSizeKeepingCentre (vol.getWidth() - 8, juce::jmin (vol.getHeight(), 60)));
     ip.removeFromTop (8);
     voicingTitle_ = ip.removeFromTop (26);
     resetVoicing_.setBounds (voicingTitle_.withLeft (voicingTitle_.getRight() - 58).reduced (0, 3));

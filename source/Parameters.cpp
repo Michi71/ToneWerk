@@ -57,6 +57,22 @@ juce::StringArray instrumentNames()
 
 juce::String instrumentId (int index) { return instrument (index).preset; }
 
+namespace
+{
+    constexpr int kPolyphony[] = { 0, 64, 48, 32, 24, 16, 12, 8 };
+}
+
+const juce::StringArray& polyphonyChoices()
+{
+    static const juce::StringArray choices { "All", "64", "48", "32", "24", "16", "12", "8" };
+    return choices;
+}
+
+int polyphonyVoices (int choice)
+{
+    return kPolyphony[juce::jlimit (0, int (std::size (kPolyphony)) - 1, choice)];
+}
+
 const juce::StringArray& voicingIds (Family family)
 {
     static const juce::StringArray tines { ids::hardness, ids::hammerMass, ids::strikePoint, ids::gauge, ids::pickupGap,
@@ -205,6 +221,12 @@ Layout createParameterLayout()
     model->addChild (number (ids::damperRelease, "Damper Release", { -90.0f, 300.0f, 1.0f }, 0.0f, "%", 0));
     layout.add (std::move (model));
 
+    // the polyphony limit (an engine setting: a change rebuilds the instrument); last, after the voicing
+    auto engine = std::make_unique<juce::AudioProcessorParameterGroup> ("engine", "Engine", "|");
+    engine->addChild (std::make_unique<AudioParameterChoice> (ParameterID { ids::polyphony, kVersion }, "Polyphony",
+        polyphonyChoices(), 0));
+    layout.add (std::move (engine));
+
     return layout;
 }
 
@@ -218,7 +240,8 @@ const juce::StringArray& allParameterIds()
         ids::delayOn, ids::delayTime, ids::delayFeedback, ids::delayMix, ids::delayPingPong,
         ids::reverbOn, ids::reverbMix, ids::reverbSize, ids::reverbDecay, ids::reverbDamping, ids::reverbPredelay, ids::reverbWidth,
         ids::humanize,
-        ids::hammerMass, ids::strikePoint, ids::gauge, ids::pickupGap, ids::pickupOffset, ids::tonebarDetune, ids::damperRelease
+        ids::hammerMass, ids::strikePoint, ids::gauge, ids::pickupGap, ids::pickupOffset, ids::tonebarDetune, ids::damperRelease,
+        ids::polyphony
     };
     return all;
 }

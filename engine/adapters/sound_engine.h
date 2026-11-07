@@ -42,6 +42,7 @@ struct Setup
     Voicing voicing;
     double trimDb = 0.0;   // level on top of the preset
     bool strikeScatter = false; // the engine's own scatter of the hammer speed (off: the plugin's Humanize does it)
+    int maxVoices = 0;     // polyphony limit (0: every key); over it the quietest voice fades out in 20-30 ms
 };
 
 class SoundEngine
@@ -61,6 +62,9 @@ public:
     virtual void controller (int cc, int value) = 0;
     virtual void allNotesOff() = 0;
     virtual void process (float* out, int frames) = 0; // mono, overwritten, at the prepared rate
+
+    // the keys sounding now, incl. those fading out after a steal (tests, a meter)
+    virtual int activeKeys() const = 0;
 
     // the instrument's keys (MIDI notes); outside them the engine stays silent
     virtual int lowestKey() const = 0;
