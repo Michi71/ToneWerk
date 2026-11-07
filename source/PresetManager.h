@@ -30,7 +30,8 @@ public:
     juce::StringArray factoryNames() const;
     juce::StringArray userNames() const;
 
-    // message thread: set the parameters (notifying the host) and remember the name
+    // message thread: set the parameters (notifying the host) and remember the name. The MIDI assignments (MidiLearn) stay,
+    // unless a user preset was saved with its own
     bool load (const Entry& entry);
     bool loadFactory (int index);
     bool loadUser (const juce::String& name);

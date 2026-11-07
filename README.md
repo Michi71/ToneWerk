@@ -80,8 +80,21 @@ compiled into it. The engines render mono; the effect chain and the reverb make 
   The host saves the state, including the preset name, with the project.
 - **Keyboard**: the keys of the instrument (E1–E7 for the Rhodes and the clavinet, A1–C7 Wurlitzer, F1–E6 Pianet, A0–C8 the
   pianos), playable with the mouse; incoming MIDI notes light up.
-- MIDI: note on/off with velocity, CC64 (half pedal; the Pianet has none), CC1 (pickup offset of the physical models), CC7
+- **MIDI**: note on/off with velocity, CC64 (half pedal; the Pianet has none), CC1 (pickup offset of the physical models), CC7
   (the hybrid voices' volume), CC120/123.
+- **MIDI learn**: right-click a knob, switch or choice box (the instrument too) for **MIDI Learn**: the next controller that
+  arrives is assigned to it, and from then on its value 0–127 spans the parameter's range (a switch turns on above 63). A
+  control has at most one CC and a CC at most one control: learning again moves the assignment. **Forget CC n** removes the
+  control's assignment, **Clear all** every one. An assigned control shows its CC in a small tag (a dot on the section
+  switches) and in its tooltip; while learning it is outlined. CC64 and the channel mode messages (CC120–127) cannot be
+  learned; CC1 and CC7 can, and then no longer reach the instrument. The assignments are saved with the project and in user
+  presets: loading a user preset that carries assignments replaces the current ones, factory presets keep them. Works
+  without a host (Standalone); in a host the parameter changes reach its automation. The parameters are set on the message
+  thread a few milliseconds after the CC (`source/MidiLearn.*`).
+- **Program change**: a MIDI program change loads the factory preset of that number in the order of the list (program 0 is the
+  first), also when it is the current one (back to its saved state). Bank select is ignored. The plugin offers the host no
+  program list (a VST3 host's own program list loaded presets over the restored state): in the standalone app and AU hosts
+  program changes arrive as MIDI; VST3 hosts may not pass them on.
 
 ## How it works
 

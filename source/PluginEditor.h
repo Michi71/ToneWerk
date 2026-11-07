@@ -9,9 +9,93 @@
 #include <juce_audio_utils/juce_audio_utils.h>
 
 #include <map>
+#include <type_traits>
 
 namespace tw
 {
+// MIDI learn on a control: the right-click menu and the hint of the assigned CC (PluginEditor.cpp)
+namespace learnui
+{
+    // "MIDI Learn" (or "Cancel MIDI Learn"), "Forget CC n", "Clear all"
+    juce::PopupMenu menu (MidiLearn& learn, const juce::String& parameterId);
+    void showMenu (MidiLearn& learn, const juce::String& parameterId, juce::Component& target);
+    juce::String tooltip (const juce::String& base, int cc, bool learning);
+    // compact: a dot instead of the tag (the switches)
+    void paintHint (juce::Graphics& g, juce::Rectangle<int> bounds, int cc, bool learning, bool compact);
+    MidiLearn* of (juce::AudioProcessorValueTreeState& state); // the processor's
+} // namespace learnui
+
+// a control (Slider, ToggleButton, ComboBox) whose parameter can be learned: a right click opens the MIDI learn menu instead
+// of reaching the control, the tooltip and a small hint show the assigned CC
+template <class Base>
+class Learnable : public Base, private juce::ChangeListener
+{
+public:
+    using Base::Base;
+    ~Learnable() override
+    {
+        if (learn_ != nullptr)
+            learn_->removeChangeListener (this);
+    }
+
+    void attachMidiLearn (MidiLearn* learn, const juce::String& parameterId, const juce::String& tooltip)
+    {
+        if (learn_ != nullptr)
+            learn_->removeChangeListener (this);
+        learn_ = learn;
+        id_ = parameterId;
+        tooltip_ = tooltip;
+        if (learn_ != nullptr)
+            learn_->addChangeListener (this);
+        refresh();
+    }
+    const juce::String& parameterId() const { return id_; }
+    void showMidiLearnMenu()
+    {
+        if (learn_ != nullptr)
+            learnui::showMenu (*learn_, id_, *this);
+    }
+
+    void mouseDown (const juce::MouseEvent& e) override
+    {
+        if (learn_ != nullptr && e.mods.isPopupMenu())
+            showMidiLearnMenu();
+        else
+            Base::mouseDown (e);
+    }
+    void mouseDrag (const juce::MouseEvent& e) override
+    {
+        if (learn_ == nullptr || !e.mods.isPopupMenu())
+            Base::mouseDrag (e);
+    }
+    void mouseUp (const juce::MouseEvent& e) override
+    {
+        if (learn_ == nullptr || !e.mods.isPopupMenu())
+            Base::mouseUp (e);
+    }
+    void paintOverChildren (juce::Graphics& g) override
+    {
+        Base::paintOverChildren (g);
+        if (cc_ >= 0 || learning_)
+            learnui::paintHint (g, this->getLocalBounds(), cc_, learning_, std::is_base_of_v<juce::Button, Base>);
+    }
+
+private:
+    void changeListenerCallback (juce::ChangeBroadcaster*) override { refresh(); }
+    void refresh()
+    {
+        cc_ = learn_ != nullptr ? learn_->ccFor (id_) : -1;
+        learning_ = learn_ != nullptr && learn_->learning() == id_;
+        this->setTooltip (learnui::tooltip (tooltip_, cc_, learning_));
+        this->repaint();
+    }
+
+    MidiLearn* learn_ = nullptr;
+    juce::String id_, tooltip_;
+    int cc_ = -1;
+    bool learning_ = false;
+};
+
 // a rotary control with its name above and its value below, attached to a parameter
 class Knob : public juce::Component
 {
@@ -19,9 +103,10 @@ public:
     Knob (juce::AudioProcessorValueTreeState& state, const juce::String& id, const juce::String& name);
     void setTitle (const juce::String& name) { label_.setText (name, juce::dontSendNotification); }
     void resized() override;
+    Learnable<juce::Slider>& slider() { return slider_; }
 
 private:
-    juce::Slider slider_;
+    Learnable<juce::Slider> slider_;
     juce::Label label_;
     juce::AudioProcessorValueTreeState::SliderAttachment attachment_;
 };
@@ -38,7 +123,7 @@ public:
 
 private:
     juce::String title_;
-    std::unique_ptr<juce::ToggleButton> switch_;
+    std::unique_ptr<Learnable<juce::ToggleButton>> switch_;
     std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> switchAttachment_;
     std::vector<std::pair<std::unique_ptr<juce::Component>, float>> items_;
 };
@@ -75,7 +160,7 @@ private:
     bool shownFactory_ = false;
 
     // instrument panel
-    juce::ComboBox instrumentBox_;
+    tw::Learnable<juce::ComboBox> instrumentBox_;
     std::unique_ptr<juce::AudioProcessorValueTreeState::ComboBoxAttachment> instrumentAttachment_;
     juce::Label status_;
     std::unique_ptr<tw::Knob> volume_, humanize_;
@@ -88,7 +173,7 @@ private:
 
     // effects
     juce::Rectangle<int> fxPanel_;
-    juce::ToggleButton fxOn_;
+    tw::Learnable<juce::ToggleButton> fxOn_;
     std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> fxOnAttachment_;
     std::vector<std::unique_ptr<tw::Section>> fxSections_;
     static constexpr size_t kReverbSection = 7; // the last section: not dimmed by the FX switch

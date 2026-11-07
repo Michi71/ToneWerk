@@ -4,6 +4,7 @@
 
 #include <InstrumentVoice.h>
 #include <Parameters.h>
+#include <PluginEditor.h>
 #include <PluginProcessor.h>
 #include <PresetManager.h>
 
@@ -289,7 +290,8 @@ TEST_CASE ("The editor opens", "[editor]")
 }
 
 // writes a PNG of the editor to $TONEWERK_SNAPSHOT, with the instrument $TONEWERK_SNAPSHOT_INSTRUMENT (an engine preset id;
-// default the first) (hidden: ./Tests "[.snapshot]")
+// default the first); with $TONEWERK_SNAPSHOT_MIDI set, a few learned CCs, one control learning and the MIDI learn menu of the
+// drive knob drawn in (hidden: ./Tests "[.snapshot]")
 TEST_CASE ("Editor snapshot", "[.snapshot]")
 {
     const auto path = juce::SystemStats::getEnvironmentVariable ("TONEWERK_SNAPSHOT", {});
@@ -303,8 +305,47 @@ TEST_CASE ("Editor snapshot", "[.snapshot]")
         setParam (plugin, tw::ids::instrument, float (tw::instrumentIndex (id)));
     }
     REQUIRE (waitForInstrument (plugin, 512));
+    const bool midi = juce::SystemStats::getEnvironmentVariable ("TONEWERK_SNAPSHOT_MIDI", {}).isNotEmpty();
+    if (midi)
+    {
+        auto& learn = plugin.midiLearn();
+        learn.assign (1, tw::ids::volume);
+        learn.assign (21, tw::ids::fxDrive);
+        learn.assign (22, tw::ids::chorusOn);
+        learn.assign (23, tw::ids::panWave);
+        learn.assign (24, tw::ids::fxOn);
+        learn.beginLearn (tw::ids::reverbMix);
+    }
     std::unique_ptr<juce::AudioProcessorEditor> editor (plugin.createEditorAndMakeActive());
-    const auto image = editor->createComponentSnapshot (editor->getLocalBounds(), true, 1.0f);
+    juce::MessageManager::getInstance()->runDispatchLoopUntil (50); // the change messages of the assignments
+    auto image = editor->createComponentSnapshot (editor->getLocalBounds(), true, 1.0f);
+    if (midi)
+    {
+        // the menu opens in a window of its own: drawn into the image beside the knob it belongs to
+        std::function<tw::Learnable<juce::Slider>*(juce::Component&)> find = [&] (juce::Component& c) -> tw::Learnable<juce::Slider>* {
+            if (auto* s = dynamic_cast<tw::Learnable<juce::Slider>*> (&c); s != nullptr && s->parameterId() == tw::ids::fxDrive)
+                return s;
+            for (auto* child : c.getChildren())
+                if (auto* s = find (*child))
+                    return s;
+            return nullptr;
+        };
+        auto* knob = find (*editor);
+        REQUIRE (knob != nullptr);
+        knob->showMidiLearnMenu();
+        juce::MessageManager::getInstance()->runDispatchLoopUntil (200);
+        juce::Component* window = nullptr;
+        for (int i = 0; i < juce::Desktop::getInstance().getNumComponents(); ++i)
+            if (auto* c = juce::Desktop::getInstance().getComponent (i); c != nullptr && c->isVisible() && c != editor.get())
+                window = c;
+        REQUIRE (window != nullptr);
+        const auto menuImage = window->createComponentSnapshot (window->getLocalBounds(), true, 1.0f);
+        const auto at = editor->getLocalArea (knob, knob->getLocalBounds()).getCentre();
+        juce::Graphics g (image);
+        g.drawImageAt (menuImage, at.x, at.y);
+        juce::PopupMenu::dismissAllActiveMenus();
+        juce::MessageManager::getInstance()->runDispatchLoopUntil (50);
+    }
     juce::File file (path);
     file.deleteFile();
     juce::FileOutputStream out (file);

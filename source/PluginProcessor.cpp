@@ -13,7 +13,8 @@ PluginProcessor::PluginProcessor()
     : AudioProcessor (BusesProperties().withOutput ("Output", juce::AudioChannelSet::stereo(), true)),
       juce::Thread ("ToneWerk loader"),
       apvts_ (*this, nullptr, "ToneWerk", tw::createParameterLayout()),
-      presets_ (apvts_)
+      presets_ (apvts_),
+      midiLearn_ (apvts_)
 {
     auto raw = [this] (const char* id) {
         auto* p = apvts_.getRawParameterValue (id);
@@ -52,10 +53,12 @@ PluginProcessor::PluginProcessor()
     scratch_.setSize (5, kChunk);
     reverb_.prepare (48000.0);
     startThread (juce::Thread::Priority::normal);
+    startTimer (10);
 }
 
 PluginProcessor::~PluginProcessor()
 {
+    stopTimer();
     stopThread (4000);
     delete pending_.exchange (nullptr);
     delete retired_.exchange (nullptr);
@@ -202,8 +205,18 @@ void PluginProcessor::adoptPending()
 
 void PluginProcessor::handleMidi (const juce::MidiMessage& m)
 {
-    if (m.isController() && m.getControllerNumber() == 64)
-        sustain_ = m.getControllerValue();
+    if (m.isController())
+    {
+        if (m.getControllerNumber() == 64)
+            sustain_ = m.getControllerValue();
+        if (midiLearn_.handleController (m.getControllerNumber(), m.getControllerValue()))
+            return; // learned: it sets a parameter instead
+    }
+    else if (m.isProgramChange())
+    {
+        pendingProgram_.store (m.getProgramChangeNumber());
+        return;
+    }
     if (active_ == nullptr)
         return;
     if (m.isNoteOn())
@@ -371,6 +384,16 @@ void PluginProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::Midi
     }
     for (int ch = 2; ch < buffer.getNumChannels(); ++ch)
         buffer.clear (ch, 0, n);
+}
+
+// --- message thread: MIDI that changes the plugin --------------------------------------------------------------------------
+
+void PluginProcessor::dispatchMidi()
+{
+    midiLearn_.dispatch();
+    // a MIDI program change loads the factory preset of that number, even when it is the current one (back to its saved state)
+    if (const int program = pendingProgram_.exchange (-1); program >= 0 && program < presets_.factoryNames().size())
+        presets_.loadFactory (program);
 }
 
 // --- state ---------------------------------------------------------------------------------------------------------------

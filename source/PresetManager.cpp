@@ -2,6 +2,7 @@
 // SPDX-FileCopyrightText: 2026 Michi71
 #include "PresetManager.h"
 
+#include "MidiLearn.h"
 #include "Parameters.h"
 
 namespace tw
@@ -136,6 +137,13 @@ bool PresetManager::loadUser (const juce::String& name)
         const auto child = tree.getChildWithProperty ("id", id);
         if (child.isValid() && child.hasProperty ("value"))
             setParameter (state_, id, float (child.getProperty ("value")));
+    }
+    // a preset saved with MIDI assignments brings them along; one without keeps the current ones
+    if (const auto map = tree.getChildWithName (MidiLearn::kTreeType); map.isValid())
+    {
+        if (const auto old = state_.state.getChildWithName (MidiLearn::kTreeType); old.isValid())
+            state_.state.removeChild (old, nullptr);
+        state_.state.appendChild (map.createCopy(), nullptr);
     }
     setCurrent (name.trim(), false);
     return true;

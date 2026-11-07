@@ -6,6 +6,9 @@
 // the instrument or the voicing changes (engine preparation is not real-time safe) and hands
 // it over through an atomic pointer; the audio thread adopts it at the next block, fades the old one out and hands that back
 // for deletion. Nothing is allocated or freed on the audio thread.
+//
+// MIDI that changes the plugin itself (a learned CC, a program change) is not acted on in processBlock: the audio thread leaves
+// it in atomic slots and a timer on the message thread sets the parameters or loads the preset, notifying the host.
 #pragma once
 
 #include <juce_audio_processors/juce_audio_processors.h>
@@ -16,13 +19,14 @@
 #include "InstrumentVoice.h"
 #include "Humanize.h"
 #include "Limiter.h"
+#include "MidiLearn.h"
 #include "PresetManager.h"
 #include "Reverb.h"
 
 #include <atomic>
 #include <utility>
 
-class PluginProcessor : public juce::AudioProcessor, private juce::Thread
+class PluginProcessor : public juce::AudioProcessor, private juce::Thread, private juce::Timer
 {
 public:
     PluginProcessor();
@@ -43,6 +47,9 @@ public:
     bool isMidiEffect() const override { return false; }
     double getTailLengthSeconds() const override { return 10.0; } // the longest reverb
 
+    // One program for the host. The factory presets as host programs gave VST3 an automatable "Program" parameter that loads a
+    // preset over every other parameter, and pluginval's state restoration failed on it; a MIDI program change loads the
+    // factory preset inside the plugin instead (dispatchMidi).
     int getNumPrograms() override { return 1; }
     int getCurrentProgram() override { return 0; }
     void setCurrentProgram (int) override {}
@@ -54,6 +61,9 @@ public:
 
     juce::AudioProcessorValueTreeState& state() { return apvts_; }
     tw::PresetManager& presets() { return presets_; }
+    tw::MidiLearn& midiLearn() { return midiLearn_; }
+    // message thread: acts on the learned CCs and the program change the audio thread received (the timer calls it)
+    void dispatchMidi();
     juce::MidiKeyboardState& keyboardState() { return keyboardState_; }
 
     // what the loaded instrument says about itself (engine, rate); message thread
@@ -71,6 +81,7 @@ private:
     static constexpr double kSwitchMs = 20.0; // cross-fade of the FX and reverb switches
 
     void run() override; // the loader thread
+    void timerCallback() override { dispatchMidi(); }
     tw::VoiceConfig wantedConfig() const;
     int64_t wantedSignature() const;
     void build (const tw::VoiceConfig& config);
@@ -83,7 +94,9 @@ private:
 
     juce::AudioProcessorValueTreeState apvts_;
     tw::PresetManager presets_;
+    tw::MidiLearn midiLearn_;
     juce::MidiKeyboardState keyboardState_;
+    std::atomic<int> pendingProgram_ { -1 }; // audio -> message thread
 
     // parameters read on the audio and loader threads
     std::atomic<float>* instrument_ = nullptr;
