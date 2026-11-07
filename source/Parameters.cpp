@@ -192,11 +192,13 @@ Layout createParameterLayout()
     reverb->addChild (number (ids::reverbWidth, "Reverb Width", { 0.0f, 100.0f, 0.1f }, 100.0f, "%", 0));
     layout.add (std::move (reverb));
 
-    // the technician's controls of the physical models (pmtines, pmreeds); last, so the earlier parameters keep their places
+    // the technician's controls of the physical models (pmtines, pmreeds); last, so the earlier parameters keep their places.
+    // A heavier hammer and a thinner tine or reed stop at +100 % and -30 %: further, with a hard hammer, the contact of the
+    // models runs away (engine/adapters)
     auto model = std::make_unique<juce::AudioProcessorParameterGroup> ("model", "Voicing", "|");
-    model->addChild (number (ids::hammerMass, "Hammer Mass", { -80.0f, 200.0f, 1.0f }, 0.0f, "%", 0));
+    model->addChild (number (ids::hammerMass, "Hammer Mass", { -80.0f, 100.0f, 1.0f }, 0.0f, "%", 0));
     model->addChild (number (ids::strikePoint, "Strike Point", { -50.0f, 100.0f, 1.0f }, 0.0f, "%", 0));
-    model->addChild (number (ids::gauge, "Tine/Reed Gauge", { -50.0f, 100.0f, 1.0f }, 0.0f, "%", 0));
+    model->addChild (number (ids::gauge, "Tine/Reed Gauge", { -30.0f, 100.0f, 1.0f }, 0.0f, "%", 0));
     model->addChild (number (ids::pickupGap, "Pickup Gap", { -80.0f, 300.0f, 1.0f }, 0.0f, "%", 0));
     model->addChild (number (ids::pickupOffset, "Pickup Offset", { -1.0f, 1.0f, 0.01f }, 0.0f, "", 2));
     model->addChild (number (ids::tonebarDetune, "Tonebar Detune", { -50.0f, 50.0f, 0.1f }, 0.0f, "ct"));

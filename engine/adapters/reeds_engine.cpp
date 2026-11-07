@@ -55,10 +55,12 @@ std::unique_ptr<SoundEngine> createReedsEngine (const Setup& setup, std::string*
     if (!setup.strikeScatter)
         p.humanSpeed = 0.0f;
     // A harder or heavier hammer on a thinner reed stiffens the contact beyond what the engine's two sub-steps per sample
-    // integrate: combined extremes (hardness +200, mass +200, gauge -50) ran away to inf. Sixteen keep every corner of the
-    // voicing ranges stable (tests "Random voicing combinations"); neutral and softer voicings keep the calibrated two.
+    // integrate: combined extremes ran away to inf (and a NaN reed position indexes the Wurlitzer's pickup table out of
+    // bounds on x86). Within the plugin's ranges (mass up to +100 %, gauge down to -30 %) eight sub-steps keep every corner
+    // finite; 32 leave a margin of four for other compilers and maths libraries. Neutral and softer voicings keep the
+    // calibrated two, so the instruments as calibrated are unchanged.
     if (v.hardness > 0.0f || v.hammerMass > 0.0f || v.gauge < 0.0f)
-        p.hammerSubsteps = std::max (p.hammerSubsteps, 16.0f);
+        p.hammerSubsteps = std::max (p.hammerSubsteps, 32.0f);
     p.trimDb += float (setup.trimDb);
     return std::make_unique<ReedsEngine> (p);
 }

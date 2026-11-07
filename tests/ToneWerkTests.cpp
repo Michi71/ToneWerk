@@ -370,8 +370,8 @@ TEST_CASE ("Voicing extremes per instrument", "[.voicing]")
     const std::vector<std::vector<Setting>> settings {
         {}, { { tw::ids::hardness, -200 } }, { { tw::ids::hardness, 200 } }, { { tw::ids::decay, -90 } }, { { tw::ids::decay, 300 } },
         { { tw::ids::unison, -100 } }, { { tw::ids::unison, 200 } }, { { tw::ids::stretch, -20 } }, { { tw::ids::stretch, 20 } },
-        { { tw::ids::hammerMass, -80 } }, { { tw::ids::hammerMass, 200 } }, { { tw::ids::strikePoint, -50 } },
-        { { tw::ids::strikePoint, 100 } }, { { tw::ids::gauge, -50 } }, { { tw::ids::gauge, 100 } }, { { tw::ids::pickupGap, -80 } },
+        { { tw::ids::hammerMass, -80 } }, { { tw::ids::hammerMass, 100 } }, { { tw::ids::strikePoint, -50 } },
+        { { tw::ids::strikePoint, 100 } }, { { tw::ids::gauge, -30 } }, { { tw::ids::gauge, 100 } }, { { tw::ids::pickupGap, -80 } },
         { { tw::ids::pickupGap, 300 } }, { { tw::ids::pickupOffset, -1 } }, { { tw::ids::pickupOffset, 1 } },
         { { tw::ids::tonebarDetune, -50 } }, { { tw::ids::tonebarDetune, 50 } }, { { tw::ids::damperRelease, -90 } },
         { { tw::ids::damperRelease, 300 } }
@@ -552,13 +552,14 @@ TEST_CASE ("Loud chords stay out of the soft clip", "[audio][levels]")
 }
 
 // random combinations of every voicing control over its whole range, as a host's automation sets them: every instrument builds
-// and plays finite (pluginval's editor automation crashed on Linux)
+// and plays finite (pluginval's editor automation crashed on Linux; then this test on Linux and Windows with mass +200 and
+// gauge -50, a NaN reed position indexing the Wurlitzer pickup table)
 TEST_CASE ("Random voicing combinations build and play", "[audio][voicing]")
 {
     juce::Random random (20261107);
     PluginProcessor plugin; // the parameter ranges
     for (int i = 0; i < instrumentCount(); ++i)
-        for (int round = 0; round < 12; ++round)
+        for (int round = 0; round < 24; ++round)
         {
             tw::VoiceConfig config;
             config.instrument = i;

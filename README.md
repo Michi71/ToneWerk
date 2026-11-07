@@ -66,7 +66,8 @@ compiled into it. The engines render mono; the effect chain and the reverb make 
   controls (hardness, hammer mass, strike point, tine or reed gauge, pickup gap and offset, the Rhodes' tonebar, damper), the
   hybrid voices hardness, decay, unison and stretch on their poles ([docs/INSTRUMENTS.md](docs/INSTRUMENTS.md)). Every change
   rebuilds the instrument (after 250 ms without further changes); sounding notes stop. A harder or heavier hammer or a thinner
-  tine or reed integrates the hammer contact with 16 sub-steps instead of 2: combined extremes ran away otherwise. The settings stay when the instrument
+  tine or reed integrates the hammer contact with 32 sub-steps instead of 2, and hammer mass (+100 %) and gauge (−30 %) stop
+  short of where combined extremes ran away. The settings stay when the instrument
   changes, and extremes carry over: **Reset** sets every control back to the instrument as calibrated.
 - **Effects**: the MK8 chain in the units of the Rhodes V8 Pro – preamp (drive, envelope, level), equalizer, Vari-Pan,
   compressor, chorus, phaser, delay. The **FX** switch bypasses the whole chain; like the reverb switch it cross-fades over
