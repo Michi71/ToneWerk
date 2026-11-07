@@ -40,12 +40,12 @@ void InstrumentVoice::prepare (double hostRate, int maxFrames)
     switch (instrument (config_.instrument).family)
     {
         case engines::Family::Tines:
-            status_ = "Physical model" + dot + "pmtines" + dot + rate;
+            status_ = "Physical model" + dot + "Rhodes" + dot + rate;
             break;
         case engines::Family::Reeds:
-            status_ = "Physical model" + dot + "pmreeds" + dot + rate;
+            status_ = "Physical model" + dot + "reed piano" + dot + rate;
             break;
-        case engines::Family::SynthKeys:
+        case engines::Family::Hybrid:
             status_ = "Hybrid: sampled attack, computed modes" + dot + rate;
             break;
     }

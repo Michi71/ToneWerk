@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # SPDX-FileCopyrightText: 2026 Michi71
-# The sound engines (engine/UPSTREAM.md): pmtines, pmreeds and synthkeys, and the MK8 effect chain of pmpiano. No dependencies,
+# The sound engines (engine/UPSTREAM.md): the Rhodes, reed and hybrid engines, and the MK8 effect chain. No dependencies,
 # no fast math (key_voice.cpp refuses it).
 #
 # All three engines call themselves pmp::Engine. Each is built as its own static library with the namespace renamed by the
@@ -29,12 +29,12 @@ function(tonewerk_engine_options target)
   endif()
 endfunction()
 
-# --- the MK8 preamp and effect chain (pmpiano src/core, namespace pmp) --------------------------------------------------
+# --- the MK8 preamp and effect chain (namespace pmp) -----------------------------------------------------------------------
 add_library(mk8fx STATIC fx/src/core/mk8_fx.cpp)
 target_include_directories(mk8fx PUBLIC fx/src)
 tonewerk_engine_options(mk8fx)
 
-# --- pmtines: the Rhodes ---------------------------------------------------------------------------------------------------
+# --- the Rhodes engine ------------------------------------------------------------------------------------------------------
 add_library(tines STATIC
   tines/src/core/params.cpp
   tines/src/core/tine_designer.cpp
@@ -45,7 +45,7 @@ target_include_directories(tines PRIVATE tines/src PUBLIC adapters)
 target_compile_definitions(tines PRIVATE pmp=pmp_tines)
 tonewerk_engine_options(tines)
 
-# --- pmreeds: Wurlitzer and Pianet -----------------------------------------------------------------------------------------
+# --- the reed engine: Wurlitzer and Pianet ---------------------------------------------------------------------------------
 add_library(reeds STATIC
   reeds/src/core/params.cpp
   reeds/src/core/reed_designer.cpp
@@ -56,54 +56,54 @@ target_include_directories(reeds PRIVATE reeds/src PUBLIC adapters)
 target_compile_definitions(reeds PRIVATE pmp=pmp_reeds)
 tonewerk_engine_options(reeds)
 
-# --- synthkeys: the hybrid voices, their banks compiled in -----------------------------------------------------------------
-# synthkeys embeds its banks as generated sources (30-110 MB of text each); ToneWerk keeps the images (synthkeys/banks) and
+# --- the hybrid engine: its banks compiled in --------------------------------------------------------------------------------
+# the hybrid engine embeds its banks as generated sources (30-110 MB of text each); ToneWerk keeps the images (hybrid/banks) and
 # generates the same sources at build time with a small host tool
 add_executable(tonewerk_embed_bank tools/embed_bank.cpp)
-set(SYNTHKEYS_BANKS splendid:Splendid clav:Clav upright:Upright salamander:Salamander)
-set(SYNTHKEYS_BANK_SOURCES)
-foreach(entry ${SYNTHKEYS_BANKS})
+set(HYBRID_BANKS splendid:Splendid clav:Clav upright:Upright salamander:Salamander)
+set(HYBRID_BANK_SOURCES)
+foreach(entry ${HYBRID_BANKS})
   string(REPLACE ":" ";" parts "${entry}")
   list(GET parts 0 file)
   list(GET parts 1 name)
   string(TOLOWER "${name}" lower)
-  set(image "${CMAKE_CURRENT_SOURCE_DIR}/synthkeys/banks/${file}.bank")
-  set(source "${CMAKE_CURRENT_BINARY_DIR}/synthkeys/hybrid_${lower}_bank.cpp")
+  set(image "${CMAKE_CURRENT_SOURCE_DIR}/hybrid/banks/${file}.bank")
+  set(source "${CMAKE_CURRENT_BINARY_DIR}/hybrid/hybrid_${lower}_bank.cpp")
   add_custom_command(OUTPUT "${source}"
     COMMAND tonewerk_embed_bank "${image}" "core/hybrid_${lower}_bank.h" "kHybrid${name}Bank" "${source}"
     DEPENDS tonewerk_embed_bank "${image}"
-    COMMENT "Embedding the synthkeys bank ${file}.bank"
+    COMMENT "Embedding the hybrid bank ${file}.bank"
     VERBATIM)
-  list(APPEND SYNTHKEYS_BANK_SOURCES "${source}")
+  list(APPEND HYBRID_BANK_SOURCES "${source}")
 endforeach()
 
 # The bank arrays (up to 18 M elements) cost the compiler memory: 3.2 GB for the Salamander with clang. They compile one at a
 # time (a Ninja job pool; other generators ignore it) and unoptimised: they only need to be laid out.
 set_property(GLOBAL APPEND PROPERTY JOB_POOLS tonewerk_banks=1)
-add_library(synthkeys_banks OBJECT ${SYNTHKEYS_BANK_SOURCES})
-target_include_directories(synthkeys_banks PRIVATE synthkeys/src)
-target_compile_definitions(synthkeys_banks PRIVATE pmp=pmp_synthkeys)
-tonewerk_engine_options(synthkeys_banks)
-set_target_properties(synthkeys_banks PROPERTIES JOB_POOL_COMPILE tonewerk_banks)
+add_library(hybrid_banks OBJECT ${HYBRID_BANK_SOURCES})
+target_include_directories(hybrid_banks PRIVATE hybrid/src)
+target_compile_definitions(hybrid_banks PRIVATE pmp=pmp_hybrid)
+tonewerk_engine_options(hybrid_banks)
+set_target_properties(hybrid_banks PROPERTIES JOB_POOL_COMPILE tonewerk_banks)
 if(MSVC)
-  target_compile_options(synthkeys_banks PRIVATE /Od)
+  target_compile_options(hybrid_banks PRIVATE /Od)
 else()
-  target_compile_options(synthkeys_banks PRIVATE -O0)
+  target_compile_options(hybrid_banks PRIVATE -O0)
 endif()
 
-add_library(synthkeys STATIC
-  synthkeys/src/core/params.cpp
-  synthkeys/src/core/engine.cpp
-  synthkeys/src/core/hybrid_bank.cpp
-  synthkeys/src/core/hybrid_player.cpp
-  $<TARGET_OBJECTS:synthkeys_banks>
-  adapters/synthkeys_engine.cpp)
-target_include_directories(synthkeys PRIVATE synthkeys/src PUBLIC adapters)
-target_compile_definitions(synthkeys PRIVATE pmp=pmp_synthkeys)
-tonewerk_engine_options(synthkeys)
+add_library(hybrid STATIC
+  hybrid/src/core/params.cpp
+  hybrid/src/core/engine.cpp
+  hybrid/src/core/hybrid_bank.cpp
+  hybrid/src/core/hybrid_player.cpp
+  $<TARGET_OBJECTS:hybrid_banks>
+  adapters/hybrid_engine.cpp)
+target_include_directories(hybrid PRIVATE hybrid/src PUBLIC adapters)
+target_compile_definitions(hybrid PRIVATE pmp=pmp_hybrid)
+tonewerk_engine_options(hybrid)
 
 # --- the interface the plugin uses -------------------------------------------------------------------------------------------
 add_library(soundengines STATIC adapters/sound_engine.cpp)
 target_include_directories(soundengines PUBLIC adapters)
-target_link_libraries(soundengines PUBLIC tines reeds synthkeys)
+target_link_libraries(soundengines PUBLIC tines reeds hybrid)
 tonewerk_engine_options(soundengines)

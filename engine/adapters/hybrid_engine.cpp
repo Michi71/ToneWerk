@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // SPDX-FileCopyrightText: 2026 Michi71
-// synthkeys_engine.cpp - the synthkeys engine (the hybrid voices) behind tw::engines::SoundEngine; built with pmp renamed to
-// pmp_synthkeys
+// hybrid_engine.cpp - the hybrid engine (a sampled attack into computed modes) behind tw::engines::SoundEngine; built with pmp
+// renamed to pmp_hybrid
 #include "families.h"
 
 #include <core/engine.h>
@@ -13,10 +13,10 @@ namespace tw::engines
 {
 namespace
 {
-    class SynthKeysEngine final : public SoundEngine
+    class HybridEngine final : public SoundEngine
     {
     public:
-        SynthKeysEngine (const pmp::Params& p, const pmp::HybridVoicing& v) : engine_ (p), voicing_ (v)
+        HybridEngine (const pmp::Params& p, const pmp::HybridVoicing& v) : engine_ (p), voicing_ (v)
         {
             engine_.setHybridVoicing (voicing_);
         }
@@ -44,7 +44,7 @@ namespace
     };
 } // namespace
 
-std::unique_ptr<SoundEngine> createSynthKeysEngine (const Setup& setup, std::string* error)
+std::unique_ptr<SoundEngine> createHybridEngine (const Setup& setup, std::string* error)
 {
     pmp::Params p;
     if (!p.loadPreset (setup.preset, error))
@@ -55,9 +55,9 @@ std::unique_ptr<SoundEngine> createSynthKeysEngine (const Setup& setup, std::str
     v.decay = setup.voicing.decay;
     v.unison = setup.voicing.unison;
     v.stretch = setup.voicing.stretch;
-    return std::make_unique<SynthKeysEngine> (p, v);
+    return std::make_unique<HybridEngine> (p, v);
 }
 
-int synthKeysPresetCount() { return pmp::Params::presetCount(); }
-std::string synthKeysPresetId (int index) { return pmp::Params::presetId (index); }
+int hybridPresetCount() { return pmp::Params::presetCount(); }
+std::string hybridPresetId (int index) { return pmp::Params::presetId (index); }
 } // namespace tw::engines

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // SPDX-FileCopyrightText: 2026 Michi71
-// tines_engine.cpp - the pmtines engine (the Rhodes) behind tw::engines::SoundEngine; built with pmp renamed to pmp_tines
+// tines_engine.cpp - the Rhodes engine behind tw::engines::SoundEngine; built with pmp renamed to pmp_tines
 #include "families.h"
 
 #include <core/engine.h>

@@ -79,7 +79,7 @@ TEST_CASE ("The instruments are the presets of the three engines", "[parameters]
     CHECK (tw::instrumentNames().size() == instrumentCount());
     // every preset of every engine is an instrument, and every instrument a preset of its engine
     int presets = 0;
-    for (const auto family : { Family::Tines, Family::Reeds, Family::SynthKeys })
+    for (const auto family : { Family::Tines, Family::Reeds, Family::Hybrid })
         for (int k = 0; k < tw::engines::presetCount (family); ++k, ++presets)
         {
             const auto id = tw::engines::presetId (family, k);

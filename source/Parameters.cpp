@@ -10,8 +10,8 @@ using engines::Family;
 
 const std::vector<Instrument>& instruments()
 {
-    // the Rhodes (pmtines), the reed pianos (pmreeds), the hybrid voices (synthkeys). The physical models keep the levels
-    // their repositories calibrate (the median of C3-C5 at velocity 100 on one target); the trims bring the hybrid voices to
+    // the Rhodes, the reed pianos (both physical models), the hybrid voices. The physical models keep the levels their
+    // engines calibrate (the median of C3-C5 at velocity 100 on one target); the trims bring the hybrid voices to
     // them: at C4 velocity 100 the RMS of the first 200 ms was -25.3 (clavinet), -19.2 (Splendid), -25.1 (Salamander),
     // -18.0 dB (upright) against -21.3 ... -22.7 dB of the Rhodes (tests "[.levels]"). The Salamander gets 1 dB, not 3: its
     // sharp attacks put loud chords into the soft clip at +3 (0.013 % of the samples of chord4 v100, "[levels]")
@@ -24,10 +24,10 @@ const std::vector<Instrument>& instruments()
         { Family::Tines, "sparkletop", "Rhodes Sparkle Top", 0.0f },
         { Family::Reeds, "wurli", "Wurlitzer 200A", 0.0f },
         { Family::Reeds, "pianet", "Hohner Pianet T", 0.0f },
-        { Family::SynthKeys, "clavinet", "Hohner Clavinet D6", 3.0f },
-        { Family::SynthKeys, "splendid_hybrid", "Splendid Grand Piano", -3.0f },
-        { Family::SynthKeys, "salamander", "Salamander Grand Piano", 1.0f },
-        { Family::SynthKeys, "upright", "Upright Piano KW", -4.0f },
+        { Family::Hybrid, "clavinet", "Hohner Clavinet D6", 3.0f },
+        { Family::Hybrid, "splendid_hybrid", "Splendid Grand Piano", -3.0f },
+        { Family::Hybrid, "salamander", "Salamander Grand Piano", 1.0f },
+        { Family::Hybrid, "upright", "Upright Piano KW", -4.0f },
     };
     return all;
 }
@@ -129,7 +129,7 @@ namespace
 
 Layout createParameterLayout()
 {
-    // the effect values of the MK8 section every pmpiano preset carried (they stay the defaults of saved projects)
+    // the effect values the MK8 section of the earlier engine's presets carried (they stay the defaults of saved projects)
     struct
     {
         float fxVolume = 53, fxDrive = 25, fxEnvelope = 0, fxBass = 3, fxMid = -3, fxMidFreq = 500, fxTreble = 3;
@@ -192,7 +192,7 @@ Layout createParameterLayout()
     reverb->addChild (number (ids::reverbWidth, "Reverb Width", { 0.0f, 100.0f, 0.1f }, 100.0f, "%", 0));
     layout.add (std::move (reverb));
 
-    // the technician's controls of the physical models (pmtines, pmreeds); last, so the earlier parameters keep their places.
+    // the technician's controls of the physical models (Rhodes, reed pianos); last, so the earlier parameters keep their places.
     // A heavier hammer and a thinner tine or reed stop at +100 % and -30 %: further, with a hard hammer, the contact of the
     // models runs away (engine/adapters)
     auto model = std::make_unique<juce::AudioProcessorParameterGroup> ("model", "Voicing", "|");
