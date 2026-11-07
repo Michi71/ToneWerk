@@ -25,6 +25,7 @@ struct VoiceConfig
 {
     int instrument = 0;
     engines::Voicing voicing;
+    int maxVoices = 0; // polyphony limit, 0: every key
 
     // the voicing controls in a fixed order (comparison, signature)
     std::array<float, 11> voicingValues() const
@@ -36,7 +37,7 @@ struct VoiceConfig
 
     bool operator== (const VoiceConfig& o) const
     {
-        if (instrument != o.instrument)
+        if (instrument != o.instrument || maxVoices != o.maxVoices)
             return false;
         const auto a = voicingValues(), b = o.voicingValues();
         for (size_t i = 0; i < a.size(); ++i)
@@ -86,6 +87,7 @@ public:
     // the engine produced a non-finite sample; the voice stays silent from then on (audio thread; read anywhere)
     bool failed() const { return failed_.load (std::memory_order_relaxed); }
     const juce::String& status() const { return status_; }
+    int activeKeys() const { return engine_ ? engine_->activeKeys() : 0; } // sounding keys (tests)
     int lowestKey() const { return engine_ ? engine_->lowestKey() : 0; }
     int highestKey() const { return engine_ ? engine_->highestKey() : 127; }
 

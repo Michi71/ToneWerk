@@ -35,6 +35,7 @@ namespace
         void controller (int cc, int value) override { engine_.processMidiController (cc, value); }
         void allNotesOff() override { engine_.allNotesOff(); }
         void process (float* out, int frames) override { engine_.process (out, frames); }
+        int activeKeys() const override { return engine_.activeKeys(); }
         int lowestKey() const override { return std::max (pmp::kFirstKey, int (std::lround (engine_.params().keysLo))); }
         int highestKey() const override { return std::min (pmp::kLastKey, int (std::lround (engine_.params().keysHi))); }
 
@@ -50,6 +51,7 @@ std::unique_ptr<SoundEngine> createHybridEngine (const Setup& setup, std::string
     if (!p.loadPreset (setup.preset, error))
         return nullptr;
     p.trimDb += float (setup.trimDb);
+    p.maxVoices = float (std::max (0, setup.maxVoices));
     pmp::HybridVoicing v;
     v.hardness = setup.voicing.hardness;
     v.decay = setup.voicing.decay;

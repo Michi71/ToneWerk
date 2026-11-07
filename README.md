@@ -60,6 +60,11 @@ compiled into it. The engines render mono; the effect chain and the reverb make 
   strikes scatters by about 1 dB. Applies to every instrument; the physical models are built without their own speed scatter
   (they keep the scatter of the felt, `human.contact`). At 0 % the hybrid voices repeat a strike bit for bit (at the bank's
   rate).
+- **Voices** (polyphony): *All* (default) or a limit of 64 … 8 keys for slower computers. Over the limit a new key makes the
+  quietest voice fade out in 20–30 ms without a click (a released key before a held one). Changing it rebuilds the instrument.
+  Measured on an Apple M4 Max at 48 kHz with the effect chain and the reverb on, every key held with the pedal costs 4–9 % of
+  one core (the Salamander the most), with 16 voices 2–4 %; a ten-year-old laptop needs about three to four times as much
+  (`./Builds/Tests "[.cpu]"` measures it).
 - **Voicing**: the controls of the instrument's engine on top of its calibration. The physical models take the technician's
   controls (hardness, hammer mass, strike point, tine or reed gauge, pickup gap and offset, the Rhodes' tonebar, damper), the
   hybrid voices hardness, decay, unison and stretch on their poles ([docs/INSTRUMENTS.md](docs/INSTRUMENTS.md)). Every change

@@ -645,3 +645,105 @@ TEST_CASE ("Random voicing combinations build and play", "[audio][voicing]")
             CHECK (!voice.failed());
         }
 }
+
+// CPU load per instrument (hidden: ./Tests "[.cpu]"): the share of real time the plugin needs at 48 kHz, 256 frames, effect
+// chain and reverb on, for a held chord, a pedalled run and every key of the instrument with the pedal down, the last also
+// with the polyphony limited to 16
+TEST_CASE ("CPU load per instrument", "[.cpu]")
+{
+    constexpr double rate = 48000.0;
+    constexpr int block = 256;
+    PluginProcessor plugin;
+    plugin.setRateAndBufferSizeDetails (rate, block);
+    plugin.prepareToPlay (rate, block);
+    setParam (plugin, tw::ids::fxOn, 1.0f);
+    setParam (plugin, tw::ids::reverbOn, 1.0f);
+    juce::AudioBuffer<float> buffer (2, block);
+    for (int i = 0; i < instrumentCount(); ++i)
+    {
+        setParam (plugin, tw::ids::instrument, float (i));
+        REQUIRE (waitForInstrument (plugin, block));
+        juce::String line = tw::instrumentId (i).paddedRight (' ', 16);
+        struct Play
+        {
+            const char* name;
+            int keys; // 0: every key
+        };
+        for (const auto& play : { Play { "8 keys", 8 }, Play { "24 keys", 24 }, Play { "all keys", 0 }, Play { "all keys, 16 voices", -16 } })
+        {
+            setParam (plugin, tw::ids::polyphony, float (play.keys < 0 ? tw::polyphonyChoices().indexOf ("16") : 0));
+            REQUIRE (waitForInstrument (plugin, block));
+            // silence first
+            for (int b = 0; b < 40; ++b)
+            {
+                juce::MidiBuffer m;
+                if (b == 0)
+                    m.addEvent (juce::MidiMessage::allSoundOff (1), 0);
+                plugin.processBlock (buffer, m);
+            }
+            juce::MidiBuffer on;
+            on.addEvent (juce::MidiMessage::controllerEvent (1, 64, 127), 0);
+            int n = 0;
+            for (int note = 21; note <= 108; ++note)
+                if (play.keys <= 0 || (note >= 36 && n < play.keys && (note - 36) % 2 == 0))
+                {
+                    on.addEvent (juce::MidiMessage::noteOn (1, note, (juce::uint8) 100), 0);
+                    ++n;
+                }
+            const int blocks = int (2.0 * rate / block);
+            const auto t0 = juce::Time::getHighResolutionTicks();
+            for (int b = 0; b < blocks; ++b)
+            {
+                plugin.processBlock (buffer, b == 0 ? on : *std::make_unique<juce::MidiBuffer>());
+            }
+            const double secs = juce::Time::highResolutionTicksToSeconds (juce::Time::getHighResolutionTicks() - t0);
+            line << "  " << play.name << " " << juce::String (100.0 * secs / (blocks * block / rate), 1) << " %";
+            juce::MidiBuffer off;
+            off.addEvent (juce::MidiMessage::controllerEvent (1, 64, 0), 0);
+            off.addEvent (juce::MidiMessage::allNotesOff (1), 0);
+            plugin.processBlock (buffer, off);
+        }
+        WARN (line);
+    }
+}
+
+// the polyphony limit reaches every engine: 24 keys struck with the pedal down, at most the limit sounds once the stolen voices
+// have faded (20-30 ms); without a limit all of them ring
+TEST_CASE ("The polyphony limit holds for every engine", "[audio][polyphony]")
+{
+    for (const char* id : { "mark1", "wurli", "salamander" })
+        for (const int limit : { 0, 8 })
+        {
+            INFO (id << " limit " << limit);
+            tw::VoiceConfig config;
+            config.instrument = tw::instrumentIndex (id);
+            REQUIRE (config.instrument >= 0);
+            config.maxVoices = limit;
+            tw::InstrumentVoice voice (config);
+            voice.prepare (48000.0, 512);
+            voice.controller (64, 127);
+            int struck = 0;
+            for (int note = 36; struck < 24; ++note)
+                if (note >= voice.lowestKey() && note <= voice.highestKey())
+                {
+                    voice.noteOn (note, 100);
+                    ++struck;
+                }
+            std::vector<float> l (512), r (512);
+            for (int b = 0; b < int (0.3 * 48000.0 / 512); ++b)
+                voice.render (l.data(), r.data(), 512);
+            if (limit > 0)
+                CHECK (voice.activeKeys() <= limit);
+            else
+                CHECK (voice.activeKeys() == 24);
+        }
+}
+
+TEST_CASE ("The polyphony choices map to voice limits", "[parameters][polyphony]")
+{
+    CHECK (tw::polyphonyVoices (0) == 0);
+    CHECK (tw::polyphonyVoices (tw::polyphonyChoices().indexOf ("16")) == 16);
+    CHECK (tw::polyphonyVoices (tw::polyphonyChoices().size() - 1) == 8);
+    PluginProcessor plugin;
+    CHECK (plugin.state().getRawParameterValue (tw::ids::polyphony)->load() < 0.5f); // default: every key
+}

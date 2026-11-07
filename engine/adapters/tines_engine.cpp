@@ -29,6 +29,7 @@ namespace
         void controller (int cc, int value) override { engine_.processMidiController (cc, value); }
         void allNotesOff() override { engine_.allNotesOff(); }
         void process (float* out, int frames) override { engine_.process (out, frames); }
+        int activeKeys() const override { return engine_.activeKeys(); }
         int lowestKey() const override { return pmp::kFirstKey; }
         int highestKey() const override { return pmp::kLastKey; }
 
@@ -61,6 +62,7 @@ std::unique_ptr<SoundEngine> createTinesEngine (const Setup& setup, std::string*
     if (v.hardness > 0.0f || v.hammerMass > 0.0f || v.gauge < 0.0f)
         p.hammerSubsteps = std::max (p.hammerSubsteps, 32.0f);
     p.trimDb += float (setup.trimDb);
+    p.maxVoices = float (std::max (0, setup.maxVoices));
     return std::make_unique<TinesEngine> (p);
 }
 

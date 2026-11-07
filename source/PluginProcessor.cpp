@@ -35,6 +35,7 @@ PluginProcessor::PluginProcessor()
     tonebarDetune_ = raw (ids::tonebarDetune);
     damperRelease_ = raw (ids::damperRelease);
     humanizeAmount_ = raw (ids::humanize);
+    polyphony_ = raw (ids::polyphony);
     fxp_ = { raw (ids::fxOn), raw (ids::fxVolume), raw (ids::fxDrive), raw (ids::fxEnvelope), raw (ids::fxBass), raw (ids::fxMid),
         raw (ids::fxMidFreq), raw (ids::fxTreble), raw (ids::panOn), raw (ids::panWave), raw (ids::panRate), raw (ids::panDepth),
         raw (ids::compOn), raw (ids::compAmount), raw (ids::compMakeup), raw (ids::chorusOn), raw (ids::chorusRate),
@@ -70,6 +71,7 @@ tw::VoiceConfig PluginProcessor::wantedConfig() const
 {
     tw::VoiceConfig c;
     c.instrument = int (std::lround (instrument_->load()));
+    c.maxVoices = tw::polyphonyVoices (int (std::lround (polyphony_->load())));
     auto& v = c.voicing;
     v.hardness = hardness_->load();
     v.decay = decay_->load();
@@ -87,7 +89,7 @@ tw::VoiceConfig PluginProcessor::wantedConfig() const
 
 static int64_t signatureOf (const tw::VoiceConfig& c)
 {
-    auto h = int64_t (c.instrument) * 1000003;
+    auto h = int64_t (c.instrument) * 1000003 + int64_t (c.maxVoices) * 7919;
     for (float v : c.voicingValues())
         h = h * 31 + int64_t (std::lround (v * 100.0f));
     return h;
