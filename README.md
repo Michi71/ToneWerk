@@ -123,7 +123,8 @@ compiled into it. The engines render mono; the effect chain and the reverb make 
 
 `.github/workflows/build.yml` builds and tests on macOS (universal), Linux and Windows, validates the VST3 with pluginval
 (strictness 10) and uploads one zip per platform. The compiles come from sccache (GitHub's cache); link-time optimisation, whose
-links cannot be cached and took most of a build, is on only for a `v*` tag, which creates a release with the three zips. The builds
+links cannot be cached and took most of a build, is on only for a `v*` tag, which creates a release with the three zips (each with `LICENSE` and
+`packaging/CREDITS.md`); its text is `packaging/RELEASE_NOTES.md`, so update that file and `VERSION` before tagging. The builds
 are not signed: macOS reports them as unidentified (`xattr -dr com.apple.quarantine <plugin>`), Windows SmartScreen likewise.
 
 ## Licence

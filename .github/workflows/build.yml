@@ -112,7 +112,11 @@ jobs:
 
       - name: Zip
         working-directory: ${{ env.ARTIFACTS_PATH }}
-        run: 7z a -tzip "${{ env.ARTIFACT_NAME }}.zip" "-xr!*.a" "-xr!*.lib" "-xr!*.pdb" .
+        # the licence and the credits go with every binary (CC BY 3.0 asks for the attribution of the clavinet and Salamander banks)
+        run: |
+          cp "${{ github.workspace }}/LICENSE" LICENSE.txt
+          cp "${{ github.workspace }}/packaging/CREDITS.md" CREDITS.md
+          7z a -tzip "${{ env.ARTIFACT_NAME }}.zip" "-xr!*.a" "-xr!*.lib" "-xr!*.pdb" .
 
       - name: Upload
         uses: actions/upload-artifact@v4
@@ -128,8 +132,13 @@ jobs:
       contents: write
     steps:
       - uses: actions/download-artifact@v4
+      - uses: actions/checkout@v4
+        with:
+          path: source
+          sparse-checkout: packaging
       - uses: softprops/action-gh-release@v2
         with:
           prerelease: true
+          body_path: source/packaging/RELEASE_NOTES.md
           files: |
             */*.zip
