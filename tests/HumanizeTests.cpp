@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // SPDX-FileCopyrightText: 2026 Michi71
-#include <BankLocator.h>
 #include <Humanize.h>
 #include <Parameters.h>
 #include <PluginProcessor.h>
@@ -39,7 +38,10 @@ std::vector<float> strike (PluginProcessor& p)
     {
         juce::MidiBuffer off;
         if (b == 0)
+        {
             off.addEvent (juce::MidiMessage::noteOff (1, 60), 0);
+            off.addEvent (juce::MidiMessage::allSoundOff (1), 0); // the hybrid voices' slow share and harp ring on for seconds
+        }
         p.processBlock (buffer, off);
     }
     std::vector<float> out;
@@ -119,13 +121,13 @@ TEST_CASE ("Humanize makes repeated strikes differ, and off they are identical",
 
 TEST_CASE ("Without humanize the hybrid voices repeat a strike bit for bit", "[humanize][audio]")
 {
-    // at the bank's rate (44.1 kHz): through the resampler a strike lands at another fraction of an engine sample each time
-    // (measured at 48 kHz: -30 ... -39 dB of difference, a shift below 23 us). The physical model keeps its felt scatter.
-    if (tw::findBank (1) == juce::File())
-        SKIP ("no banks found");
+    // at the bank's rate (the Salamander bank: 44.1 kHz): through a resampler a strike lands at another fraction of a bank
+    // sample each time. The physical models keep their felt scatter (human.contact).
     PluginProcessor plugin;
     plugin.setRateAndBufferSizeDetails (44100.0, 512);
     plugin.prepareToPlay (44100.0, 512);
+    REQUIRE (tw::instrumentIndex ("salamander") >= 0);
+    set (plugin, tw::ids::instrument, float (tw::instrumentIndex ("salamander")));
     REQUIRE (ready (plugin));
     set (plugin, tw::ids::humanize, 0.0f);
     strike (plugin);

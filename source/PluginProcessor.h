@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // SPDX-FileCopyrightText: 2026 Michi71
-// PluginProcessor.h - ToneWerk: the pmpiano hybrid instruments as a plugin
+// PluginProcessor.h - ToneWerk: the instruments of pmtines, pmreeds and synthkeys with the MK8 effect chain as a plugin
 //
 // Threads: the audio thread plays the active InstrumentVoice and the effect chain. A loader thread builds a new voice whenever
-// the instrument, the voicing or the bank folder changes (bank loading and engine preparation are not real-time safe) and hands
+// the instrument or the voicing changes (engine preparation is not real-time safe) and hands
 // it over through an atomic pointer; the audio thread adopts it at the next block, fades the old one out and hands that back
 // for deletion. Nothing is allocated or freed on the audio thread.
 #pragma once
@@ -20,7 +20,7 @@
 #include "Reverb.h"
 
 #include <atomic>
-#include <deque>
+#include <utility>
 
 class PluginProcessor : public juce::AudioProcessor, private juce::Thread
 {
@@ -56,10 +56,10 @@ public:
     tw::PresetManager& presets() { return presets_; }
     juce::MidiKeyboardState& keyboardState() { return keyboardState_; }
 
-    // what the loaded instrument says about itself (bank, rate, fallback); message thread
+    // what the loaded instrument says about itself (engine, rate); message thread
     juce::String instrumentStatus() const;
-    // the bank folder changed: reload the instrument from it
-    void reloadBanks() { bankGeneration_.fetch_add (1); }
+    // the keys the loaded instrument plays (MIDI notes); any thread
+    std::pair<int, int> instrumentKeys() const { return { keyLo_.load(), keyHi_.load() }; }
     // the strike variation's random sequence, for repeatable tests
     void seedHumanize (uint64_t seed) { humanize_.seed (seed); }
     // true when the voice built for the current parameters plays (tests; the audio thread adopts it in processBlock)
@@ -73,7 +73,6 @@ private:
     void run() override; // the loader thread
     tw::VoiceConfig wantedConfig() const;
     int64_t wantedSignature() const;
-    std::shared_ptr<tw::BankImage> bankFor (int slot, int generation);
     void build (const tw::VoiceConfig& config);
 
     void adoptPending();
@@ -93,6 +92,8 @@ private:
     std::atomic<float>* decay_ = nullptr;
     std::atomic<float>* unison_ = nullptr;
     std::atomic<float>* stretch_ = nullptr;
+    std::atomic<float>*hammerMass_ = nullptr, *strikePoint_ = nullptr, *gauge_ = nullptr, *pickupGap_ = nullptr,
+                       *pickupOffset_ = nullptr, *tonebarDetune_ = nullptr, *damperRelease_ = nullptr;
     std::atomic<float>* humanizeAmount_ = nullptr;
     struct FxParams
     {
@@ -109,15 +110,13 @@ private:
     std::atomic<tw::InstrumentVoice*> pending_ { nullptr };
     std::atomic<tw::InstrumentVoice*> retired_ { nullptr };
     std::atomic<double> hostRate_ { 48000.0 };
-    std::atomic<int> bankGeneration_ { 0 };
     std::atomic<bool> rebuild_ { false };
     std::atomic<int64_t> readyGeneration_ { -1 };
 
-    // loader thread only
-    std::deque<std::shared_ptr<tw::BankImage>> bankCache_;
-    int bankCacheGeneration_ = -1;
+    // loader thread only (read under the lock or atomically)
     mutable juce::CriticalSection statusLock_;
     juce::String status_;
+    std::atomic<int> keyLo_ { 21 }, keyHi_ { 108 };
 
     // audio thread only
     std::unique_ptr<tw::InstrumentVoice> active_, fading_;

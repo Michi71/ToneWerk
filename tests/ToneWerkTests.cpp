@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2026 Michi71
 #include "helpers/test_helpers.h"
 
-#include <BankLocator.h>
+#include <InstrumentVoice.h>
 #include <Parameters.h>
 #include <PluginProcessor.h>
 #include <PresetManager.h>
@@ -10,11 +10,11 @@
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_string.hpp>
 
-#include <core/params.h>
+#include <sound_engine.h>
 
 namespace
 {
-bool banksAvailable() { return tw::findBank (1) != juce::File(); }
+int instrumentCount() { return int (tw::instruments().size()); }
 
 // processes empty blocks until the voice for the current parameters plays (the loader builds it on its thread)
 bool waitForInstrument (PluginProcessor& p, int blockSize, double seconds = 30.0)
@@ -72,11 +72,22 @@ TEST_CASE ("Plugin instance", "[instance]")
     CHECK (plugin.acceptsMidi());
 }
 
-TEST_CASE ("The instruments are the presets of the engine", "[parameters]")
+TEST_CASE ("The instruments are the presets of the three engines", "[parameters]")
 {
-    CHECK (tw::instrumentNames().size() == pmp::Params::presetCount());
-    for (int i = 0; i < pmp::Params::presetCount(); ++i)
-        CHECK (tw::instrumentId (i) == juce::String (pmp::Params::presetId (i)));
+    using tw::engines::Family;
+    CHECK (tw::instrumentNames().size() == instrumentCount());
+    // every preset of every engine is an instrument, and every instrument a preset of its engine
+    int presets = 0;
+    for (const auto family : { Family::Tines, Family::Reeds, Family::SynthKeys })
+        for (int k = 0; k < tw::engines::presetCount (family); ++k, ++presets)
+        {
+            const auto id = tw::engines::presetId (family, k);
+            INFO (id);
+            const int index = tw::instrumentIndex (id);
+            REQUIRE (index >= 0);
+            CHECK (tw::instrument (index).family == family);
+        }
+    CHECK (presets == instrumentCount());
 
     PluginProcessor plugin;
     for (const auto& id : tw::allParameterIds())
@@ -84,19 +95,7 @@ TEST_CASE ("The instruments are the presets of the engine", "[parameters]")
     CHECK (int (plugin.getParameters().size()) == tw::allParameterIds().size());
 }
 
-TEST_CASE ("Banks are found in the source tree", "[banks]")
-{
-    if (!juce::File (TONEWERK_TEST_BANKS_DIR).getChildFile ("mark1_hybrid.bank").existsAsFile()
-        || juce::File (TONEWERK_TEST_BANKS_DIR).getChildFile ("mark1_hybrid.bank").getSize() < 4096)
-        SKIP ("banks/ is not checked out (Git LFS)");
-    for (int slot = 0; slot < pmp::Engine::kHybridSlots; ++slot)
-    {
-        INFO ("slot " << slot);
-        CHECK (tw::findBank (slot).getFileName() == tw::bankFileName (slot));
-    }
-}
-
-TEST_CASE ("A note sounds, at the bank's rate and resampled", "[audio]")
+TEST_CASE ("A note sounds at every host rate", "[audio]")
 {
     for (const double rate : { 44100.0, 48000.0, 96000.0 })
     {
@@ -116,17 +115,15 @@ TEST_CASE ("A note sounds, at the bank's rate and resampled", "[audio]")
     }
 }
 
-TEST_CASE ("Every instrument builds and plays or reports why not", "[audio][instruments]")
+TEST_CASE ("Every instrument builds and plays", "[audio][instruments]")
 {
-    if (!banksAvailable())
-        SKIP ("no banks found");
     PluginProcessor plugin;
     plugin.setRateAndBufferSizeDetails (48000.0, 512);
     plugin.prepareToPlay (48000.0, 512);
     setParam (plugin, tw::ids::humanize, 0.0f); // measurements at the nominal velocity
-    for (int i = 0; i < pmp::Params::presetCount(); ++i)
+    for (int i = 0; i < instrumentCount(); ++i)
     {
-        INFO ("instrument " << pmp::Params::presetId (i));
+        INFO ("instrument " << tw::instrumentId (i));
         setParam (plugin, tw::ids::instrument, float (i));
         REQUIRE (waitForInstrument (plugin, 512));
         INFO (plugin.instrumentStatus());
@@ -291,7 +288,8 @@ TEST_CASE ("The editor opens", "[editor]")
     });
 }
 
-// writes a PNG of the editor to $TONEWERK_SNAPSHOT (hidden: ./Tests "[.snapshot]")
+// writes a PNG of the editor to $TONEWERK_SNAPSHOT, with the instrument $TONEWERK_SNAPSHOT_INSTRUMENT (an engine preset id;
+// default the first) (hidden: ./Tests "[.snapshot]")
 TEST_CASE ("Editor snapshot", "[.snapshot]")
 {
     const auto path = juce::SystemStats::getEnvironmentVariable ("TONEWERK_SNAPSHOT", {});
@@ -299,6 +297,11 @@ TEST_CASE ("Editor snapshot", "[.snapshot]")
         SKIP ("TONEWERK_SNAPSHOT not set");
     PluginProcessor plugin;
     plugin.prepareToPlay (48000.0, 512);
+    if (const auto id = juce::SystemStats::getEnvironmentVariable ("TONEWERK_SNAPSHOT_INSTRUMENT", {}); id.isNotEmpty())
+    {
+        REQUIRE (tw::instrumentIndex (id) >= 0);
+        setParam (plugin, tw::ids::instrument, float (tw::instrumentIndex (id)));
+    }
     REQUIRE (waitForInstrument (plugin, 512));
     std::unique_ptr<juce::AudioProcessorEditor> editor (plugin.createEditorAndMakeActive());
     const auto image = editor->createComponentSnapshot (editor->getLocalBounds(), true, 1.0f);
@@ -312,8 +315,6 @@ TEST_CASE ("Editor snapshot", "[.snapshot]")
 // how long a note takes from its note-on to the attack, per instrument (hidden: ./Tests "[.latency]")
 TEST_CASE ("Note onset latency", "[.latency]")
 {
-    if (!banksAvailable())
-        SKIP ("no banks found");
     for (const double rate : { 44100.0, 48000.0 })
     {
         PluginProcessor plugin;
@@ -321,7 +322,7 @@ TEST_CASE ("Note onset latency", "[.latency]")
         plugin.setRateAndBufferSizeDetails (rate, block);
         plugin.prepareToPlay (rate, block);
         setParam (plugin, tw::ids::humanize, 0.0f); // measurements at the nominal velocity
-        for (int i = 0; i < pmp::Params::presetCount(); ++i)
+        for (int i = 0; i < instrumentCount(); ++i)
         {
             setParam (plugin, tw::ids::instrument, float (i));
             REQUIRE (waitForInstrument (plugin, block));
@@ -351,7 +352,7 @@ TEST_CASE ("Note onset latency", "[.latency]")
                         return 1000.0 * double (k) / rate;
                 return -1.0;
             };
-            WARN (juce::String (rate, 0) << " Hz  " << juce::String (pmp::Params::presetId (i)).paddedRight (' ', 10)
+            WARN (juce::String (rate, 0) << " Hz  " << tw::instrumentId (i).paddedRight (' ', 10)
                   << " -40 dB at " << juce::String (first (0.01f), 2) << " ms, -20 dB at " << juce::String (first (0.1f), 2)
                   << " ms, peak at " << juce::String (1000.0 * double (peakAt) / rate, 2) << " ms");
         }
@@ -361,8 +362,6 @@ TEST_CASE ("Note onset latency", "[.latency]")
 // every instrument at the voicing extremes: level, peak and brightness against neutral (hidden: ./Tests "[.voicing]")
 TEST_CASE ("Voicing extremes per instrument", "[.voicing]")
 {
-    if (!banksAvailable())
-        SKIP ("no banks found");
     struct Setting
     {
         const char* id;
@@ -370,20 +369,27 @@ TEST_CASE ("Voicing extremes per instrument", "[.voicing]")
     };
     const std::vector<std::vector<Setting>> settings {
         {}, { { tw::ids::hardness, -200 } }, { { tw::ids::hardness, 200 } }, { { tw::ids::decay, -90 } }, { { tw::ids::decay, 300 } },
-        { { tw::ids::unison, -100 } }, { { tw::ids::unison, 200 } }, { { tw::ids::stretch, -20 } }, { { tw::ids::stretch, 20 } }
+        { { tw::ids::unison, -100 } }, { { tw::ids::unison, 200 } }, { { tw::ids::stretch, -20 } }, { { tw::ids::stretch, 20 } },
+        { { tw::ids::hammerMass, -80 } }, { { tw::ids::hammerMass, 100 } }, { { tw::ids::strikePoint, -50 } },
+        { { tw::ids::strikePoint, 100 } }, { { tw::ids::gauge, -30 } }, { { tw::ids::gauge, 100 } }, { { tw::ids::pickupGap, -80 } },
+        { { tw::ids::pickupGap, 300 } }, { { tw::ids::pickupOffset, -1 } }, { { tw::ids::pickupOffset, 1 } },
+        { { tw::ids::tonebarDetune, -50 } }, { { tw::ids::tonebarDetune, 50 } }, { { tw::ids::damperRelease, -90 } },
+        { { tw::ids::damperRelease, 300 } }
     };
     PluginProcessor plugin;
     plugin.setRateAndBufferSizeDetails (48000.0, 512);
     plugin.prepareToPlay (48000.0, 512);
     setParam (plugin, tw::ids::humanize, 0.0f); // measurements at the nominal velocity
-    for (int i = 0; i < pmp::Params::presetCount(); ++i)
+    for (int i = 0; i < instrumentCount(); ++i)
     {
         double rms0 = 0.0, bright0 = 0.0;
         for (const auto& set : settings)
         {
-            for (const char* id : { tw::ids::hardness, tw::ids::decay, tw::ids::unison, tw::ids::stretch })
-                setParam (plugin, id, 0.0f);
+            for (const auto& id : tw::allVoicingIds())
+                setParam (plugin, id.toRawUTF8(), 0.0f);
             setParam (plugin, tw::ids::instrument, float (i));
+            if (!set.empty() && !tw::voicingIds (tw::instrument (i).family).contains (set[0].id))
+                continue; // not a control of this instrument
             for (const auto& s : set)
                 setParam (plugin, s.id, s.value);
             REQUIRE (waitForInstrument (plugin, 512));
@@ -410,7 +416,7 @@ TEST_CASE ("Voicing extremes per instrument", "[.voicing]")
             const double rms = std::sqrt (sum / 48000.0), bright = std::sqrt (diff / std::max (sum, 1e-30));
             if (set.empty())
                 rms0 = rms, bright0 = bright;
-            WARN (juce::String (pmp::Params::presetId (i)).paddedRight (' ', 10)
+            WARN (tw::instrumentId (i).paddedRight (' ', 10)
                   << (set.empty() ? juce::String ("neutral") : juce::String (set[0].id) + "=" + juce::String (set[0].value)).paddedRight (' ', 24)
                   << " level " << juce::String (20.0 * std::log10 (rms / rms0), 1) << " dB, peak " << juce::String (peak, 3)
                   << ", brightness " << juce::String (20.0 * std::log10 (bright / bright0), 1) << " dB"
@@ -422,7 +428,7 @@ TEST_CASE ("Voicing extremes per instrument", "[.voicing]")
 TEST_CASE ("The voicing reset button sets the voicing back to neutral", "[editor]")
 {
     PluginProcessor plugin;
-    for (const char* id : { tw::ids::hardness, tw::ids::decay, tw::ids::unison, tw::ids::stretch })
+    for (const char* id : { tw::ids::hardness, tw::ids::decay, tw::ids::unison, tw::ids::stretch, tw::ids::hammerMass, tw::ids::damperRelease })
         setParam (plugin, id, std::string (id) == tw::ids::stretch ? 10.0f : 50.0f);
     std::unique_ptr<juce::AudioProcessorEditor> editor (plugin.createEditorAndMakeActive());
     juce::TextButton* reset = nullptr;
@@ -433,7 +439,7 @@ TEST_CASE ("The voicing reset button sets the voicing back to neutral", "[editor
     CHECK (reset->isEnabled());
     reset->triggerClick();
     juce::MessageManager::getInstance()->runDispatchLoopUntil (50); // triggerClick is asynchronous
-    for (const char* id : { tw::ids::hardness, tw::ids::decay, tw::ids::unison, tw::ids::stretch })
+    for (const auto& id : tw::allVoicingIds())
         CHECK (std::abs (plugin.state().getRawParameterValue (id)->load()) < 1e-4f);
     CHECK (!reset->isEnabled());
     plugin.editorBeingDeleted (editor.get());
@@ -442,8 +448,6 @@ TEST_CASE ("The voicing reset button sets the voicing back to neutral", "[editor
 // the level of every instrument before the soft clip: volume -24 dB, peaks and RMS referred back to 0 dB (hidden: "[.levels]")
 TEST_CASE ("Instrument levels before the soft clip", "[.levels]")
 {
-    if (!banksAvailable())
-        SKIP ("no banks found");
     PluginProcessor plugin;
     plugin.setRateAndBufferSizeDetails (48000.0, 512);
     plugin.prepareToPlay (48000.0, 512);
@@ -458,11 +462,11 @@ TEST_CASE ("Instrument levels before the soft clip", "[.levels]")
     const std::vector<Play> plays { { "C4 v100", { 60 }, 100 }, { "C4 v127", { 60 }, 127 },
         { "chord4 v100", { 48, 55, 60, 64 }, 100 }, { "chord4 v127", { 48, 55, 60, 64 }, 127 },
         { "chord8 v127", { 36, 43, 48, 52, 55, 60, 64, 67 }, 127 } };
-    for (int i = 0; i < pmp::Params::presetCount(); ++i)
+    for (int i = 0; i < instrumentCount(); ++i)
     {
         setParam (plugin, tw::ids::instrument, float (i));
         REQUIRE (waitForInstrument (plugin, 512));
-        juce::String line = juce::String (pmp::Params::presetId (i)).paddedRight (' ', 10);
+        juce::String line = tw::instrumentId (i).paddedRight (' ', 16);
         for (const auto& play : plays)
         {
             juce::AudioBuffer<float> buffer (2, 512);
@@ -473,7 +477,8 @@ TEST_CASE ("Instrument levels before the soft clip", "[.levels]")
                     off.addEvent (juce::MidiMessage::allNotesOff (1), 0);
                 plugin.processBlock (buffer, off);
             }
-            double peak = 0.0, sum = 0.0;
+            double peak = 0.0, sum = 0.0, early = 0.0;
+            constexpr int earlyBlocks = int (0.2 * 48000.0 / 512);
             for (int b = 0; b < int (1.0 * 48000.0 / 512); ++b)
             {
                 juce::MidiBuffer midi;
@@ -488,10 +493,14 @@ TEST_CASE ("Instrument levels before the soft clip", "[.levels]")
                         const double x = buffer.getSample (ch, k);
                         peak = std::max (peak, std::abs (x));
                         sum += x * x;
+                        early += b < earlyBlocks ? x * x : 0.0;
                     }
             }
+            // peak / RMS over 1 s / RMS over the first 200 ms (the attack, where a decaying instrument is heard)
             const double peakDb = 20.0 * std::log10 (peak) + 24.0, rmsDb = 10.0 * std::log10 (sum / (2.0 * 48000.0)) + 24.0;
-            line << "  " << play.name << " " << juce::String (peakDb, 1) << "/" << juce::String (rmsDb, 1);
+            const double earlyDb = 10.0 * std::log10 (early / (2.0 * earlyBlocks * 512.0)) + 24.0;
+            line << "  " << play.name << " " << juce::String (peakDb, 1) << "/" << juce::String (rmsDb, 1) << "/"
+                 << juce::String (earlyDb, 1);
         }
         WARN (line);
     }
@@ -526,19 +535,72 @@ static double clippedShare (PluginProcessor& plugin, const std::vector<int>& not
 
 TEST_CASE ("Loud chords stay out of the soft clip", "[audio][levels]")
 {
-    if (!banksAvailable())
-        SKIP ("no banks found");
     PluginProcessor plugin;
     plugin.setRateAndBufferSizeDetails (48000.0, 512);
     plugin.prepareToPlay (48000.0, 512);
     setParam (plugin, tw::ids::humanize, 0.0f); // measurements at the nominal velocity
-    for (const char* id : { "wurli200a", "clav6", "mk8", "grandpas" })
+    for (const char* id : { "wurli", "clavinet", "mark8", "salamander" })
     {
-        setParam (plugin, tw::ids::instrument, float (pmp::Params::presetIndex (id)));
+        REQUIRE (tw::instrumentIndex (id) >= 0);
+        setParam (plugin, tw::ids::instrument, float (tw::instrumentIndex (id)));
         REQUIRE (waitForInstrument (plugin, 512));
         const double c4 = clippedShare (plugin, { 48, 55, 60, 64 }, 100), c8 = clippedShare (plugin, { 36, 43, 48, 52, 55, 60, 64, 67 }, 127);
         WARN (id << ": samples in the soft clip, chord4 v100 " << c4 << " %, chord8 v127 " << c8 << " %");
         CHECK (c4 < 0.01); // before the limiter and the level trims: up to 0.7 % (clavinet)
         CHECK (c8 < 0.5);  // before: 1.5-13.7 %
     }
+}
+
+// random combinations of every voicing control over its whole range, as a host's automation sets them: every instrument builds
+// and plays finite (pluginval's editor automation crashed on Linux; then this test on Linux and Windows with mass +200 and
+// gauge -50, a NaN reed position indexing the Wurlitzer pickup table)
+TEST_CASE ("Random voicing combinations build and play", "[audio][voicing]")
+{
+    juce::Random random (20261107);
+    PluginProcessor plugin; // the parameter ranges
+    for (int i = 0; i < instrumentCount(); ++i)
+        for (int round = 0; round < 24; ++round)
+        {
+            tw::VoiceConfig config;
+            config.instrument = i;
+            auto value = [&] (const char* id) {
+                auto* p = dynamic_cast<juce::RangedAudioParameter*> (plugin.state().getParameter (id));
+                const float extreme = random.nextBool() ? 0.0f : 1.0f;
+                return p->convertFrom0to1 (round % 2 == 0 ? random.nextFloat() : extreme);
+            };
+            auto& v = config.voicing;
+            v.hardness = value (tw::ids::hardness);
+            v.decay = value (tw::ids::decay);
+            v.unison = value (tw::ids::unison);
+            v.stretch = value (tw::ids::stretch);
+            v.hammerMass = value (tw::ids::hammerMass);
+            v.strikePoint = value (tw::ids::strikePoint);
+            v.gauge = value (tw::ids::gauge);
+            v.pickupGap = value (tw::ids::pickupGap);
+            v.pickupOffset = value (tw::ids::pickupOffset);
+            v.tonebarDetune = value (tw::ids::tonebarDetune);
+            v.damperRelease = value (tw::ids::damperRelease);
+            INFO (tw::instrumentId (i) << " round " << round << ": hardness " << v.hardness << " mass " << v.hammerMass << " strike "
+                                       << v.strikePoint << " gauge " << v.gauge << " gap " << v.pickupGap << " offset " << v.pickupOffset
+                                       << " tonebar " << v.tonebarDetune << " damper " << v.damperRelease << " decay " << v.decay
+                                       << " unison " << v.unison << " stretch " << v.stretch);
+            tw::InstrumentVoice voice (config);
+            voice.prepare (48000.0, 512);
+            REQUIRE (!voice.silent());
+            std::vector<float> l (512), r (512);
+            double sum = 0.0;
+            for (int b = 0; b < 40; ++b)
+            {
+                if (b == 0)
+                    for (const int note : { 30, 45, 60, 72, 88 })
+                        voice.noteOn (note, 127);
+                if (b == 20)
+                    voice.allNotesOff();
+                voice.render (l.data(), r.data(), 512);
+                for (const float x : l)
+                    sum += double (x) * x;
+            }
+            CHECK (std::isfinite (sum));
+            CHECK (!voice.failed());
+        }
 }

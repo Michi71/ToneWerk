@@ -2,10 +2,7 @@
 // SPDX-FileCopyrightText: 2026 Michi71
 #include "PluginEditor.h"
 
-#include "BankLocator.h"
 #include "Parameters.h"
-
-#include <core/config.h>
 
 namespace ids = tw::ids;
 using juce::String;
@@ -168,19 +165,16 @@ PluginEditor::PluginEditor (PluginProcessor& p)
     // header
     savePreset_.setButtonText ("Save");
     deletePreset_.setButtonText ("Delete");
-    banks_.setButtonText (utf8 ("Banks\xe2\x80\xa6"));
     prevPreset_.setTooltip ("Previous preset");
     nextPreset_.setTooltip ("Next preset");
     savePreset_.setTooltip ("Save the current settings as a user preset");
     deletePreset_.setTooltip ("Delete the user preset (moves it to the trash)");
-    banks_.setTooltip ("Folder of the hybrid banks");
-    for (auto* b : { &prevPreset_, &nextPreset_, &savePreset_, &deletePreset_, &banks_ })
+    for (auto* b : { &prevPreset_, &nextPreset_, &savePreset_, &deletePreset_ })
         addAndMakeVisible (*b);
     prevPreset_.onClick = [this] { processor_.presets().step (-1); };
     nextPreset_.onClick = [this] { processor_.presets().step (1); };
     savePreset_.onClick = [this] { savePresetDialog(); };
     deletePreset_.onClick = [this] { deletePreset(); };
-    banks_.onClick = [this] { showBankMenu(); };
     presetBox_.setTextWhenNothingSelected ("(no preset)");
     presetBox_.onChange = [this] {
         const int index = presetBox_.getSelectedId() - 1;
@@ -201,12 +195,14 @@ PluginEditor::PluginEditor (PluginProcessor& p)
     addAndMakeVisible (status_);
     volume_ = std::make_unique<tw::Knob> (state, ids::volume, "Volume");
     humanize_ = std::make_unique<tw::Knob> (state, ids::humanize, "Humanize");
-    hardness_ = std::make_unique<tw::Knob> (state, ids::hardness, "Hardness");
-    decay_ = std::make_unique<tw::Knob> (state, ids::decay, "Decay");
-    unison_ = std::make_unique<tw::Knob> (state, ids::unison, "Unison");
-    stretch_ = std::make_unique<tw::Knob> (state, ids::stretch, "Stretch");
-    for (auto* k : { volume_.get(), humanize_.get(), hardness_.get(), decay_.get(), unison_.get(), stretch_.get() })
+    for (auto* k : { volume_.get(), humanize_.get() })
         addAndMakeVisible (*k);
+    for (const auto& id : tw::allVoicingIds())
+    {
+        auto knob = std::make_unique<tw::Knob> (state, id, tw::voicingLabel (id, tw::engines::Family::Tines));
+        addChildComponent (*knob);
+        voicing_[id] = std::move (knob);
+    }
     resetVoicing_.setTooltip ("Reset the voicing to the instrument as calibrated (all controls 0)");
     resetVoicing_.onClick = [this] { resetVoicing(); };
     addAndMakeVisible (resetVoicing_);
@@ -257,8 +253,8 @@ PluginEditor::PluginEditor (PluginProcessor& p)
     reverb->add (knob (ids::reverbPredelay, "Pre-Delay"));
     reverb->add (knob (ids::reverbWidth, "Width"));
 
-    // keyboard: the 73 keys of the engine
-    keyboard_.setAvailableRange (pmp::kFirstKey, pmp::kLastKey);
+    // keyboard: the keys of the instrument (showInstrument)
+    keyboard_.setAvailableRange (21, 108);
     keyboard_.setOctaveForMiddleC (4);
     keyboard_.setScrollButtonsVisible (false);
     keyboard_.setVelocity (0.8f, true);
@@ -324,8 +320,6 @@ void PluginEditor::resized()
     auto r = getLocalBounds();
     auto header = r.removeFromTop (56).reduced (12, 12);
     header.removeFromLeft (200);
-    banks_.setBounds (header.removeFromRight (100));
-    header.removeFromRight (16);
     deletePreset_.setBounds (header.removeFromRight (82));
     header.removeFromRight (6);
     savePreset_.setBounds (header.removeFromRight (92));
@@ -340,14 +334,17 @@ void PluginEditor::resized()
     const int keyboardHeight = juce::jlimit (110, 180, getHeight() / 5);
     auto keys = r.removeFromBottom (keyboardHeight).reduced (12, 0).withTrimmedBottom (10);
     keyboard_.setBounds (keys);
-    keyboard_.setKeyWidth (float (keys.getWidth()) / 43.0f); // 43 white keys from E1 to E7
+    int whiteKeys = 0;
+    for (int note = keyboard_.getRangeStart(); note <= keyboard_.getRangeEnd(); ++note)
+        whiteKeys += juce::MidiMessage::isMidiNoteBlack (note) ? 0 : 1;
+    keyboard_.setKeyWidth (float (keys.getWidth()) / float (juce::jmax (1, whiteKeys)));
 
     r = r.reduced (12, 12);
-    instrumentPanel_ = r.removeFromLeft (juce::jlimit (280, 380, getWidth() / 4));
+    instrumentPanel_ = r.removeFromLeft (juce::jlimit (340, 460, getWidth() * 8 / 25));
     r.removeFromLeft (12);
     fxPanel_ = r;
 
-    // instrument panel: choice and status, the level, the voicing controls 2 x 2
+    // instrument panel: choice and status, the level, the voicing controls of the family four in a row
     auto ip = instrumentPanel_.reduced (14, 0);
     ip.removeFromTop (36);
     instrumentBox_.setBounds (ip.removeFromTop (34));
@@ -360,12 +357,15 @@ void PluginEditor::resized()
     ip.removeFromTop (8);
     voicingTitle_ = ip.removeFromTop (26);
     resetVoicing_.setBounds (voicingTitle_.withLeft (voicingTitle_.getRight() - 58).reduced (0, 3));
-    const int rowH = ip.getHeight() / 2;
-    auto row1 = ip.removeFromTop (rowH), row2 = ip;
-    hardness_->setBounds (row1.removeFromLeft (row1.getWidth() / 2));
-    decay_->setBounds (row1);
-    unison_->setBounds (row2.removeFromLeft (row2.getWidth() / 2));
-    stretch_->setBounds (row2);
+    const int columns = 4;
+    const int voicingRows = juce::jmax (2, (shownVoicing_.size() + columns - 1) / columns);
+    const int rowH = ip.getHeight() / voicingRows;
+    for (int i = 0; i < shownVoicing_.size(); ++i)
+    {
+        const int row = i / columns, column = i % columns;
+        const int x0 = ip.getX() + ip.getWidth() * column / columns, x1 = ip.getX() + ip.getWidth() * (column + 1) / columns;
+        voicing_[shownVoicing_[i]]->setBounds (x0, ip.getY() + row * rowH, x1 - x0, rowH);
+    }
 
     // effects: three rows of sections, widths after their number of controls
     auto fp = fxPanel_.reduced (12, 0);
@@ -393,8 +393,29 @@ void PluginEditor::resized()
     }
 }
 
+void PluginEditor::showInstrument()
+{
+    const int index = int (std::lround (processor_.state().getRawParameterValue (ids::instrument)->load()));
+    const auto family = tw::instrument (index).family;
+    const auto keys = processor_.instrumentKeys();
+    if (int (family) == shownFamily_ && keys == shownKeys_)
+        return;
+    shownFamily_ = int (family);
+    shownKeys_ = keys;
+    shownVoicing_ = tw::voicingIds (family);
+    for (auto& [id, knob] : voicing_)
+    {
+        knob->setVisible (shownVoicing_.contains (id));
+        knob->setTitle (tw::voicingLabel (id, family));
+    }
+    if (keys.first <= keys.second)
+        keyboard_.setAvailableRange (keys.first, keys.second);
+    resized();
+}
+
 void PluginEditor::timerCallback()
 {
+    showInstrument();
     status_.setText (processor_.instrumentStatus(), juce::dontSendNotification);
     resetVoicing_.setEnabled (!voicingIsNeutral());
     const bool fx = fxOn_.getToggleState();
@@ -488,14 +509,9 @@ void PluginEditor::deletePreset()
         });
 }
 
-namespace
-{
-const char* const kVoicingIds[] = { ids::hardness, ids::decay, ids::unison, ids::stretch };
-}
-
 bool PluginEditor::voicingIsNeutral() const
 {
-    for (const char* id : kVoicingIds)
+    for (const auto& id : tw::allVoicingIds())
         if (const auto* p = processor_.state().getParameter (id); p != nullptr && std::abs (p->getValue() - p->getDefaultValue()) > 1e-6f)
             return false;
     return true;
@@ -504,7 +520,7 @@ bool PluginEditor::voicingIsNeutral() const
 // every voicing control back to its default in one go: one rebuild of the instrument (the loader waits for the controls to rest)
 void PluginEditor::resetVoicing()
 {
-    for (const char* id : kVoicingIds)
+    for (const auto& id : tw::allVoicingIds())
         if (auto* p = processor_.state().getParameter (id))
         {
             p->beginChangeGesture();
@@ -512,49 +528,4 @@ void PluginEditor::resetVoicing()
             p->endChangeGesture();
         }
     resetVoicing_.setEnabled (false);
-}
-
-void PluginEditor::showBankMenu()
-{
-    const auto chosen = tw::userBankFolder();
-    juce::PopupMenu m;
-    m.addSectionHeader ("Hybrid banks");
-    m.addItem (1, utf8 ("Choose folder\xe2\x80\xa6"));
-    m.addItem (2, String ("Reset choice") + (chosen != juce::File() ? " (" + chosen.getFullPathName() + ")" : String()),
-        chosen != juce::File());
-    m.addItem (3, String ("Open default folder (") + tw::defaultUserBankFolder().getFullPathName() + ")");
-    m.addItem (4, "Reload banks");
-    m.addSeparator();
-    juce::PopupMenu where;
-    for (const auto& f : tw::bankSearchFolders())
-        where.addItem (f.getFullPathName(), false, f.isDirectory(), nullptr);
-    m.addSubMenu ("Search order", where);
-    m.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (banks_), [this] (int result) {
-        if (result == 1)
-        {
-            chooser_ = std::make_unique<juce::FileChooser> ("Choose the folder with the banks (*.bank)",
-                tw::defaultUserBankFolder());
-            chooser_->launchAsync (juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectDirectories,
-                [this] (const juce::FileChooser& fc) {
-                    const auto dir = fc.getResult();
-                    if (dir == juce::File())
-                        return;
-                    tw::setUserBankFolder (dir);
-                    processor_.reloadBanks();
-                });
-        }
-        else if (result == 2)
-        {
-            tw::setUserBankFolder ({});
-            processor_.reloadBanks();
-        }
-        else if (result == 3)
-        {
-            const auto dir = tw::defaultUserBankFolder();
-            dir.createDirectory();
-            dir.startAsProcess();
-        }
-        else if (result == 4)
-            processor_.reloadBanks();
-    });
 }

@@ -4,8 +4,6 @@
 
 #include "Parameters.h"
 
-#include <core/params.h>
-
 namespace tw
 {
 namespace
@@ -15,11 +13,11 @@ namespace
     struct Factory
     {
         const char* name;
-        const char* instrument; // pmp preset id
+        const char* instrument; // engine preset id (Parameters.cpp, instruments())
         std::vector<std::pair<const char*, float>> values;
     };
 
-    // the effect values not named stay at their defaults (the MK8 effect section every engine preset carries)
+    // the effect values not named stay at their defaults (the MK8 effect section of pmpiano's presets)
     const std::vector<Factory>& factoryPresets()
     {
         static const std::vector<Factory> presets {
@@ -28,23 +26,24 @@ namespace
                                               { ids::delayOn, 0 } } },
             { "Mark II Phaser", "mark2", { { ids::fxOn, 1 }, { ids::panOn, 0 }, { ids::phaserOn, 1 }, { ids::phaserRate, 0.6f },
                                              { ids::phaserDepth, 60 }, { ids::delayMix, 15 } } },
-            { "Suitcase", "suitcase", {} },
-            { "Rhodes MK8 (Modell)", "mk8", { { ids::fxOn, 1 } } },
-            { "Wurlitzer 200A", "wurli200a", {} },
-            { "Wurlitzer Chorus", "wurli200a", { { ids::fxOn, 1 }, { ids::panOn, 0 }, { ids::chorusOn, 1 }, { ids::chorusRate, 0.8f },
-                                                   { ids::chorusDepth, 3 }, { ids::delayMix, 15 } } },
-            { "Clavinet Funk", "clav6", { { ids::fxOn, 1 }, { ids::panOn, 0 }, { ids::delayOn, 0 }, { ids::fxDrive, 40 },
-                                            { ids::compAmount, 60 }, { ids::fxMid, 4 }, { ids::fxMidFreq, 1200 } } },
+            { "Mark V", "mark5", {} },
+            { "Mark 7 Chorus", "mark7", { { ids::fxOn, 1 }, { ids::panOn, 0 }, { ids::chorusOn, 1 }, { ids::chorusRate, 0.7f },
+                                            { ids::chorusDepth, 2.5f }, { ids::delayMix, 15 } } },
+            { "Mark 8 (MK8 chain)", "mark8", { { ids::fxOn, 1 } } },
+            { "Sparkle Top", "sparkletop", {} },
+            { "Wurlitzer 200A", "wurli", {} },
+            { "Wurlitzer Chorus", "wurli", { { ids::fxOn, 1 }, { ids::panOn, 0 }, { ids::chorusOn, 1 }, { ids::chorusRate, 0.8f },
+                                               { ids::chorusDepth, 3 }, { ids::delayMix, 15 } } },
             { "Pianet T", "pianet", {} },
-            // the grands in a hall; the Steinway and Grandpa's recordings carry some room already: less of it
-            { "Grand Piano", "grand", { { ids::reverbOn, 1 }, { ids::reverbMix, 28 }, { ids::reverbSize, 65 },
-                                          { ids::reverbDecay, 2.4f }, { ids::reverbDamping, 45 }, { ids::reverbPredelay, 22 } } },
-            { "Steinway Grand", "steinway", { { ids::reverbOn, 1 }, { ids::reverbMix, 18 }, { ids::reverbSize, 60 },
-                                                { ids::reverbDecay, 2.0f }, { ids::reverbDamping, 50 }, { ids::reverbPredelay, 18 } } },
-            { "Grandpa's Grand", "grandpas", { { ids::reverbOn, 1 }, { ids::reverbMix, 15 }, { ids::reverbSize, 45 },
-                                                 { ids::reverbDecay, 1.6f }, { ids::reverbDamping, 55 }, { ids::reverbPredelay, 12 } } },
-            { "CP80 Chorus", "cp80", { { ids::fxOn, 1 }, { ids::panOn, 0 }, { ids::chorusOn, 1 }, { ids::chorusRate, 1.2f },
-                                         { ids::chorusDepth, 2.5f }, { ids::delayMix, 20 } } },
+            { "Clavinet Funk", "clavinet", { { ids::fxOn, 1 }, { ids::panOn, 0 }, { ids::delayOn, 0 }, { ids::fxDrive, 40 },
+                                               { ids::compAmount, 60 }, { ids::fxMid, 4 }, { ids::fxMidFreq, 1200 } } },
+            // the pianos in a room
+            { "Splendid Grand", "splendid_hybrid", { { ids::reverbOn, 1 }, { ids::reverbMix, 24 }, { ids::reverbSize, 60 },
+                                                       { ids::reverbDecay, 2.2f }, { ids::reverbDamping, 45 }, { ids::reverbPredelay, 20 } } },
+            { "Salamander Grand", "salamander", { { ids::reverbOn, 1 }, { ids::reverbMix, 28 }, { ids::reverbSize, 65 },
+                                                    { ids::reverbDecay, 2.4f }, { ids::reverbDamping, 45 }, { ids::reverbPredelay, 22 } } },
+            { "Upright Piano", "upright", { { ids::reverbOn, 1 }, { ids::reverbMix, 15 }, { ids::reverbSize, 35 },
+                                              { ids::reverbDecay, 1.2f }, { ids::reverbDamping, 55 }, { ids::reverbPredelay, 8 } } },
         };
         return presets;
     }
@@ -117,7 +116,7 @@ bool PresetManager::loadFactory (int index)
         return false;
     const auto& f = all[size_t (index)];
     resetToDefaults();
-    setParameter (state_, ids::instrument, float (juce::jmax (0, pmp::Params::presetIndex (f.instrument))));
+    setParameter (state_, ids::instrument, float (juce::jmax (0, instrumentIndex (f.instrument))));
     for (const auto& [id, value] : f.values)
         setParameter (state_, id, value);
     setCurrent (f.name, true);
