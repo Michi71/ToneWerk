@@ -31,3 +31,7 @@ packaging/Output/*
 # local builds
 build/
 .env
+
+# demo renders (demo/make_demo_midi.py, tests "[.render]")
+demo/*.m4a
+demo/*.wav
