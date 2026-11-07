@@ -5,6 +5,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstddef>
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
@@ -88,8 +89,23 @@ struct Preset {
     const char* text;
 };
 
-const Preset kPresets[] = {
-    {"splendid_hybrid", "Splendid Grand Piano (Hybrid-Stimme)", R"(
+// The preset texts below keep their notes (calibration, sources) as '#' comments. The build drops every comment, from
+// '#' to the end of the line as setText() does, so the notes stay in the sources and out of the binary.
+template <std::size_t N>
+struct PresetText {
+    char text[N] = {};
+    constexpr PresetText(const char (&in)[N]) {
+        std::size_t o = 0;
+        bool comment = false;
+        for (std::size_t i = 0; i < N; ++i) {
+            if (in[i] == '#') comment = true;
+            if (in[i] == '\n') comment = false;
+            if (!comment) text[o++] = in[i];
+        }
+    }
+};
+
+constexpr PresetText kSplendidHybridText{R"(
 # preset:splendid_hybrid - the splendid recordings as the hybrid voice of pmpiano plays
 # them: a short PCM attack from the bank (fitted from this set by pmpiano's buildbank.py)
 # that crossfades into 48 computed modes per key, the decay in the poles instead of in
@@ -104,8 +120,8 @@ hybrid.slowT60=2.5
 hybrid.rampMs=60
 res.on=1
 res.gain=5e-6
-)"},
-    {"clavinet", "Hohner Clavinet D6", R"(
+)"};
+constexpr PresetText kClavinetText{R"(
 # preset:clavinet - the D6 as the hybrid voice: the PCM attack and the computed mode decay
 # of pmpiano's clav bank (Realistic Clavinet, CC BY 3.0); no harp, a short damper (the
 # lever), the bank's own loudness law.
@@ -116,8 +132,8 @@ hybrid.slowShare=0
 hybrid.rampMs=0
 res.on=0
 out.trimDb=-12
-)"},
-    {"upright", "Upright Piano KW (Kawai)", R"(
+)"};
+constexpr PresetText kUprightText{R"(
 # preset:upright - the Kawai upright of FreePats' Upright Piano KW (CC0) as the hybrid
 # voice: PCM attack from the bank built from the SF2, then the computed mode decay; the
 # grand's damper and a light soundboard resonance.
@@ -129,8 +145,8 @@ hybrid.slowT60=2.5
 hybrid.rampMs=60
 res.on=1
 res.gain=3e-6
-)"},
-    {"salamander", "Salamander Grand Piano", R"(
+)"};
+constexpr PresetText kSalamanderText{R"(
 # preset:salamander - Alexander Holm's Salamander V3 (Yamaha C5, CC BY 3.0) as the hybrid
 # voice: 4 anchors blended from the 16 recorded velocity layers, 44.1 kHz; the grand's
 # damper and soundboard resonance.
@@ -143,7 +159,13 @@ hybrid.rampMs=60
 res.on=1
 res.gain=5e-6
 out.trimDb=-6
-)"},
+)"};
+
+constexpr Preset kPresets[] = {
+    {"splendid_hybrid", "Splendid Grand Piano (Hybrid-Stimme)", kSplendidHybridText.text},
+    {"clavinet", "Hohner Clavinet D6", kClavinetText.text},
+    {"upright", "Upright Piano KW (Kawai)", kUprightText.text},
+    {"salamander", "Salamander Grand Piano", kSalamanderText.text},
 };
 
 struct ScalarEntry { const char* name; float Params::*ptr; const char* help; };

@@ -5,9 +5,9 @@ non-public code bases; ToneWerk changes none of their sources and only builds th
 
 | Folder | Contents | Version | Instruments |
 |---|---|---|---|
-| `tines/src/core` | the Rhodes engine (without its C API) | `ee19372e4648c77d43a811e39c83a4bf09e6a4e1` (2026-11-04) | Rhodes Mark I, Mark II, Mark V, Mark 7, Mark 8, Sparkle Top: physical models |
-| `reeds/src/core` | the reed engine (without its C API) | `a85331896c081a9a9f16fc771f26d0a1ac4d4751` (2026-11-07: a NaN reed position no longer indexes the pickup table out of bounds) | Wurlitzer 200A, Hohner Pianet T: physical models |
-| `hybrid/src/core` | the hybrid engine (without its C API and the generated `hybrid_*_bank.cpp`) | state of 2026-11-07 (no version tag yet) | Hohner Clavinet D6, Splendid Grand, Salamander Grand, Upright Piano KW: hybrid voices |
+| `tines/src/core` | the Rhodes engine (without its C API) | `f9edeeebab9c470a5e3d9c507cd6b9c64e952fb3` (2026-11-07: the preset comments stay out of the binary) | Rhodes Mark I, Mark II, Mark V, Mark 7, Mark 8, Sparkle Top: physical models |
+| `reeds/src/core` | the reed engine (without its C API) | `a85331896c081a9a9f16fc771f26d0a1ac4d4751` (2026-11-07) with the preset comments kept out of the binary (not committed yet) | Wurlitzer 200A, Hohner Pianet T: physical models |
+| `hybrid/src/core` | the hybrid engine (without its C API and the generated `hybrid_*_bank.cpp`) | state of 2026-11-07 with the preset comments kept out of the binary (no version tag yet) | Hohner Clavinet D6, Splendid Grand, Salamander Grand, Upright Piano KW: hybrid voices |
 | `hybrid/banks` | the bank images of the hybrid engine | the images of that state (CRC-32 in the `hybrid_*_bank.h` headers: b00748e0, 2ef67e42, 350743e5, 0ec9521e) | the banks of the hybrid voices |
 | `fx/src/core` | the MK8 preamp and effect chain: `mk8_fx.*`, `config.h`, `dsp.h` | `0201eccd890a6c8d6fc25689f123810c774fe0ca` (2026-10-25) | the effect chain, the soft clip |
 

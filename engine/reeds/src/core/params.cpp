@@ -5,6 +5,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstddef>
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
@@ -144,8 +145,23 @@ struct Preset {
     const char* text;
 };
 
-const Preset kPresets[] = {
-    {"wurli", "Wurlitzer 200A", R"(
+// The preset texts below keep their notes (calibration, sources) as '#' comments. The build drops every comment, from
+// '#' to the end of the line as setText() does, so the notes stay in the sources and out of the binary.
+template <std::size_t N>
+struct PresetText {
+    char text[N] = {};
+    constexpr PresetText(const char (&in)[N]) {
+        std::size_t o = 0;
+        bool comment = false;
+        for (std::size_t i = 0; i < N; ++i) {
+            if (in[i] == '#') comment = true;
+            if (in[i] == '\n') comment = false;
+            if (!comment) text[o++] = in[i];
+        }
+    }
+};
+
+constexpr PresetText kWurliText{R"(
 # preset:wurli - the reed of pmpiano's wurli200a (docs/REEDS.md), calibrated with tools/analysis/calibrate.py against
 # samples/wurli
 keys.lo=33
@@ -210,8 +226,8 @@ decay.fastShareByKey=71:0.00,72:0.50,73:0.50,74:0.50,75:0.50,76:0.50,77:0.65,78:
 decay.fastT60ByKey=71:0.88,72:0.88,73:0.88,74:0.88,75:0.88,76:0.88,77:1.15,78:1.15,79:1.15,80:1.15,81:0.88,82:0.88,83:0.88,84:0.88,85:0.88,86:0.88,87:0.674,88:0.396,89:0.396,90:0.396,92:0.535,93:0.674,94:0.674,95:0.674,96:0.08
 decay.fastLinear=0
 vel.speed=1:0.0171,20:0.2018,40:0.4499,60:0.7255,80:1.8776,100:2.2548,115:4.1718,127:4.2777
-)"},
-    {"pianet", "Hohner Pianet T", R"(
+)"};
+constexpr PresetText kPianetText{R"(
 # preset:pianet - calibrated with tools/analysis/calibrate.py against samples/pianet_ds (the Decent Sampler set: every key,
 # one take, as v127). The reed is plucked by the sticky pad of its key (excitation=1) and read by a magnetic pickup
 # (pickup.type=0); no sustain pedal: the pad is the damper. The set has one layer: the velocity behaviour is the pad's own
@@ -254,7 +270,11 @@ blow.loHz=63.51
 blow.hiHz=150
 blow.exp=2.92
 blow.gainByKey=29:0.0,48:0.0,52:10.9,55:11.1,59:10.7,62:12.9,65:10.7,68:10.7,72:9.5,75:8.1,78:6.0,81:4.5,85:5.9,88:5.2
-)"},
+)"};
+
+constexpr Preset kPresets[] = {
+    {"wurli", "Wurlitzer 200A", kWurliText.text},
+    {"pianet", "Hohner Pianet T", kPianetText.text},
 };
 
 } // namespace
