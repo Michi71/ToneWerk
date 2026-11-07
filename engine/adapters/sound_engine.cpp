@@ -12,8 +12,8 @@ std::unique_ptr<SoundEngine> createEngine (Family family, const Setup& setup, st
             return createTinesEngine (setup, error);
         case Family::Reeds:
             return createReedsEngine (setup, error);
-        case Family::SynthKeys:
-            return createSynthKeysEngine (setup, error);
+        case Family::Hybrid:
+            return createHybridEngine (setup, error);
     }
     return nullptr;
 }
@@ -26,8 +26,8 @@ int presetCount (Family family)
             return tinesPresetCount();
         case Family::Reeds:
             return reedsPresetCount();
-        case Family::SynthKeys:
-            return synthKeysPresetCount();
+        case Family::Hybrid:
+            return hybridPresetCount();
     }
     return 0;
 }
@@ -40,8 +40,8 @@ std::string presetId (Family family, int index)
             return tinesPresetId (index);
         case Family::Reeds:
             return reedsPresetId (index);
-        case Family::SynthKeys:
-            return synthKeysPresetId (index);
+        case Family::Hybrid:
+            return hybridPresetId (index);
     }
     return {};
 }

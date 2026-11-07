@@ -18,7 +18,7 @@ namespace
         std::vector<std::pair<const char*, float>> values;
     };
 
-    // the effect values not named stay at their defaults (the MK8 effect section of pmpiano's presets)
+    // the effect values not named stay at their defaults (Parameters.cpp)
     const std::vector<Factory>& factoryPresets()
     {
         static const std::vector<Factory> presets {

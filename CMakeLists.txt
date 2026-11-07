@@ -31,7 +31,7 @@ include(PamplejuceFunctions)
 add_subdirectory(JUCE)
 add_subdirectory(modules/clap-juce-extensions EXCLUDE_FROM_ALL)
 
-# the sound engines pmtines, pmreeds, synthkeys and the MK8 effect chain (engine/UPSTREAM.md)
+# the sound engines (Rhodes, reed pianos, hybrid voices) and the MK8 effect chain (engine/UPSTREAM.md)
 add_subdirectory(engine)
 
 juce_add_plugin("${PROJECT_NAME}"

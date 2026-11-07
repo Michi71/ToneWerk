@@ -2,8 +2,8 @@
 // SPDX-FileCopyrightText: 2026 Michi71
 // sound_engine.h - one interface to the three sound engines of ToneWerk (engine/UPSTREAM.md)
 //
-// pmtines (the Rhodes), pmreeds (Wurlitzer, Pianet) and synthkeys (the hybrid voices) all call their engine pmp::Engine.
-// Each is built as its own library with the namespace renamed (pmp_tines, pmp_reeds, pmp_synthkeys), and the plugin reaches
+// The Rhodes engine, the reed engine (Wurlitzer, Pianet) and the hybrid engine all call their engine pmp::Engine.
+// Each is built as its own library with the namespace renamed (pmp_tines, pmp_reeds, pmp_hybrid), and the plugin reaches
 // them only through this header, which names none of them. All three render mono.
 #pragma once
 
@@ -14,9 +14,9 @@ namespace tw::engines
 {
 enum class Family
 {
-    Tines,    // pmtines: physical models of the Rhodes
-    Reeds,    // pmreeds: physical models of the reed pianos
-    SynthKeys // synthkeys: a sampled attack that crossfades into computed modes
+    Tines,    // the Rhodes engine: physical models of the Rhodes
+    Reeds,    // the reed engine: physical models of the reed pianos
+    Hybrid    // the hybrid engine: a sampled attack that crossfades into computed modes
 };
 
 // The voicing controls on top of the calibrated preset; all 0 is the preset as calibrated. The physical models take the
@@ -31,9 +31,9 @@ struct Voicing
     float pickupOffset = 0;  // [x0/width] Tines, Reeds: pickup offset added to the preset ("bark")
     float tonebarDetune = 0; // [cent] Tines: tonebar tuning
     float damperRelease = 0; // [%] Tines, Reeds: decay time with the damper on
-    float decay = 0;         // [%] SynthKeys: T60 of every mode x 2^(decay/100)
-    float unison = 0;        // [%] SynthKeys: spread of the modes of one partial
-    float stretch = 0;       // [cent/octave] SynthKeys: stretch about C4
+    float decay = 0;         // [%] Hybrid: T60 of every mode x 2^(decay/100)
+    float unison = 0;        // [%] Hybrid: spread of the modes of one partial
+    float stretch = 0;       // [cent/octave] Hybrid: stretch about C4
 };
 
 struct Setup

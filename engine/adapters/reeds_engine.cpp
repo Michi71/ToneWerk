@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // SPDX-FileCopyrightText: 2026 Michi71
-// reeds_engine.cpp - the pmreeds engine (Wurlitzer, Pianet) behind tw::engines::SoundEngine; built with pmp renamed to pmp_reeds
+// reeds_engine.cpp - the reed engine (Wurlitzer, Pianet) behind tw::engines::SoundEngine; built with pmp renamed to pmp_reeds
 #include "families.h"
 
 #include <core/engine.h>

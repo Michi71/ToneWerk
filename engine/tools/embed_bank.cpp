@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // SPDX-FileCopyrightText: 2026 Michi71
-// embed_bank.cpp - writes a hybrid bank image as the C++ array the synthkeys engine links against
+// embed_bank.cpp - writes a hybrid bank image as the C++ array the hybrid engine links against
 //
-// synthkeys compiles its banks into the engine as generated sources (src/core/hybrid_*_bank.cpp, made by its
+// The hybrid engine compiles its banks into the engine as generated sources (src/core/hybrid_*_bank.cpp, made by its
 // tools/samples/embed_bank.py). As text they are 30-110 MB, too large for the repository, so ToneWerk keeps the bank images
-// (engine/synthkeys/banks/*.bank) and generates the same sources at build time:
+// (engine/hybrid/banks/*.bank) and generates the same sources at build time:
 //
 //   embed_bank <image.bank> <header include> <symbol> <out.cpp>
 //

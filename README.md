@@ -2,18 +2,16 @@
 
 ![ToneWerk: preset bar, instrument and voicing, the MK8 effect chain and reverb, the keyboard of the instrument](docs/images/tonewerk.png)
 
-Electric and acoustic keyboards as a plugin and standalone app, with the MK8 effect chain of
-[pmpiano](https://github.com/Michi71/pmpiano): the Rhodes Mark I, Mark II, Mark V, Mark 7, Mark 8 and Sparkle Top
-(physical models of pmtines), the Wurlitzer 200A and the Hohner Pianet T (physical models of pmreeds), and the Hohner
-Clavinet D6, the Splendid and Salamander grands and an upright piano (hybrid voices of synthkeys: a sampled attack that turns
-into computed modes). The list, the voicing controls and the licences are in [docs/INSTRUMENTS.md](docs/INSTRUMENTS.md). Built with [JUCE](https://juce.com) on the [Pamplejuce](https://github.com/sudara/pamplejuce)
+Electric and acoustic keyboards as a plugin and standalone app, with an MK8 effect chain: the Rhodes Mark I, Mark II, Mark V,
+Mark 7, Mark 8 and Sparkle Top and the Wurlitzer 200A and Hohner Pianet T (physical models), and the Hohner Clavinet D6, the
+Splendid and Salamander grands and an upright piano (hybrid voices: a sampled attack that turns into computed modes). The list, the voicing controls and the licences are in [docs/INSTRUMENTS.md](docs/INSTRUMENTS.md). Built with [JUCE](https://juce.com) on the [Pamplejuce](https://github.com/sudara/pamplejuce)
 template for **macOS, Linux and Windows** as **VST3, AU (macOS), CLAP and Standalone**.
 
 ## Repository layout
 
 | Folder | Contents |
 |---|---|
-| `engine/` | the engines of pmtines, pmreeds and synthkeys (with the synthkeys banks) and the MK8 effect chain of pmpiano; versions and build in [engine/UPSTREAM.md](engine/UPSTREAM.md) |
+| `engine/` | the three sound engines (Rhodes, reed pianos, hybrid voices with their banks) and the MK8 effect chain; versions and build in [engine/UPSTREAM.md](engine/UPSTREAM.md) |
 | `source/` | the plugin: processor, loader, resampler, presets, user interface |
 | `tests/` | Catch2 tests (`Tests`) |
 | `JUCE/`, `cmake/`, `modules/clap-juce-extensions/` | submodules (JUCE `develop`, Pamplejuce CMake helpers, CLAP) |
@@ -42,11 +40,11 @@ CMake options:
 
 | Engine | Instruments | Voice |
 |---|---|---|
-| pmtines | Rhodes Mark I, Mark II, Mark V, Mark 7, Mark 8, Sparkle Top | physical model: hammer, tine with tonebar, pickup; calibrated key by key |
-| pmreeds | Wurlitzer 200A, Hohner Pianet T | physical model: hammer or pad, reed, electrostatic or magnetic pickup |
-| synthkeys | Hohner Clavinet D6, Splendid Grand Piano, Salamander Grand Piano, Upright Piano KW | hybrid: a short PCM attack crossfades into 48 computed modes per key |
+| Rhodes | Rhodes Mark I, Mark II, Mark V, Mark 7, Mark 8, Sparkle Top | physical model: hammer, tine with tonebar, pickup; calibrated key by key |
+| Reed pianos | Wurlitzer 200A, Hohner Pianet T | physical model: hammer or pad, reed, electrostatic or magnetic pickup |
+| Hybrid | Hohner Clavinet D6, Splendid Grand Piano, Salamander Grand Piano, Upright Piano KW | hybrid: a short PCM attack crossfades into 48 computed modes per key |
 
-Nothing has to be installed besides the plugin: the physical models compute everything, and the synthkeys banks (38 MB) are
+Nothing has to be installed besides the plugin: the physical models compute everything, and the banks of the hybrid voices (38 MB) are
 compiled into it. The engines render mono; the effect chain and the reverb make the stereo image.
 
 ## Usage
@@ -108,7 +106,7 @@ compiled into it. The engines render mono; the effect chain and the reverb make 
   through one interface (`engine/adapters/sound_engine.h`, [engine/UPSTREAM.md](engine/UPSTREAM.md)).
 - A loader thread builds instruments (designs the keys, prepares the engine) and hands them over through an atomic pointer; the
   audio thread adopts them, fades the old one out and hands it back for deletion. Nothing is allocated or freed on the audio thread.
-- The effect chain (`pmp::Mk8Effects`, from pmpiano) runs in the plugin at the host rate; the engines have none.
+- The effect chain (`pmp::Mk8Effects`) runs in the plugin at the host rate; the engines have none.
 - The reverb (`source/Reverb.*`) is a feedback delay network: pre-delay, early reflections, four allpass diffusers per channel,
   eight delay lines mixed by a Hadamard matrix, each with a one-pole absorption filter set from the RT60 at low frequencies and
   at Nyquist. Slow modulation of the line lengths (read through a first-order allpass, which keeps the RT60 exact) prevents
@@ -125,6 +123,6 @@ are not signed: macOS reports them as unidentified (`xattr -dr com.apple.quarant
 
 ## Licence
 
-GPL-3.0-or-later like pmpiano, pmtines, pmreeds and synthkeys (`LICENSE`). JUCE is licensed under the AGPLv3 or the JUCE
-licence; a distributed binary is therefore subject to the terms of the AGPLv3. The synthkeys banks are covered by the licences
+GPL-3.0-or-later (`LICENSE`). JUCE is licensed under the AGPLv3 or the JUCE
+licence; a distributed binary is therefore subject to the terms of the AGPLv3. The banks of the hybrid voices are covered by the licences
 of the free recordings they are built from (public domain, CC0, CC BY 3.0; [docs/INSTRUMENTS.md](docs/INSTRUMENTS.md)).

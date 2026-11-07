@@ -2,8 +2,8 @@
 // SPDX-FileCopyrightText: 2026 Michi71
 // InstrumentVoice.h - one prepared sound engine (one instrument) and the resampler from its rate to the host rate
 //
-// The physical models (pmtines, pmreeds) run at their calibration rate, 44.1 kHz, and a short windowed-sinc resampler
-// (Resampler.h) converts to the host rate; the hybrid voices (synthkeys) carry their banks to the host rate themselves. The
+// The physical models (the Rhodes and reed engines) run at their calibration rate, 44.1 kHz, and a short windowed-sinc resampler
+// (Resampler.h) converts to the host rate; the hybrid voices carry their banks to the host rate themselves. The
 // engines render mono; the voice hands the same signal to both channels. Built and prepared off the audio thread
 // (the loader thread); render() and the MIDI calls are real-time safe.
 #pragma once

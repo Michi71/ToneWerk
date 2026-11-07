@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // SPDX-FileCopyrightText: 2026 Michi71
-// PluginProcessor.h - ToneWerk: the instruments of pmtines, pmreeds and synthkeys with the MK8 effect chain as a plugin
+// PluginProcessor.h - ToneWerk: the Rhodes, reed and hybrid instruments with the MK8 effect chain as a plugin
 //
 // Threads: the audio thread plays the active InstrumentVoice and the effect chain. A loader thread builds a new voice whenever
 // the instrument or the voicing changes (engine preparation is not real-time safe) and hands

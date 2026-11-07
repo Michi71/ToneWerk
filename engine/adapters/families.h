@@ -15,7 +15,7 @@ std::unique_ptr<SoundEngine> createReedsEngine (const Setup& setup, std::string*
 int reedsPresetCount();
 std::string reedsPresetId (int index);
 
-std::unique_ptr<SoundEngine> createSynthKeysEngine (const Setup& setup, std::string* error);
-int synthKeysPresetCount();
-std::string synthKeysPresetId (int index);
+std::unique_ptr<SoundEngine> createHybridEngine (const Setup& setup, std::string* error);
+int hybridPresetCount();
+std::string hybridPresetId (int index);
 } // namespace tw::engines

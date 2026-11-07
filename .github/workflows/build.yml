@@ -1,8 +1,8 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # SPDX-FileCopyrightText: 2026 Michi71
 # Build, test and validate ToneWerk on macOS, Linux and Windows (from the Pamplejuce template, without signing and IPP).
-# The instruments need no banks at run time: the physical models compute everything, the synthkeys banks are compiled in
-# (engine/synthkeys/banks, generated into sources at build time).
+# The instruments need no banks at run time: the physical models compute everything, the banks of the hybrid voices are compiled in
+# (engine/hybrid/banks, generated into sources at build time).
 name: Build
 
 on:
