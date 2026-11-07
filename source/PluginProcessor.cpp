@@ -2,12 +2,10 @@
 // SPDX-FileCopyrightText: 2026 Michi71
 #include "PluginProcessor.h"
 
-#include "BankLocator.h"
 #include "Parameters.h"
 #include "PluginEditor.h"
 
 #include <core/dsp.h>
-#include <core/params.h>
 
 namespace ids = tw::ids;
 
@@ -28,6 +26,13 @@ PluginProcessor::PluginProcessor()
     decay_ = raw (ids::decay);
     unison_ = raw (ids::unison);
     stretch_ = raw (ids::stretch);
+    hammerMass_ = raw (ids::hammerMass);
+    strikePoint_ = raw (ids::strikePoint);
+    gauge_ = raw (ids::gauge);
+    pickupGap_ = raw (ids::pickupGap);
+    pickupOffset_ = raw (ids::pickupOffset);
+    tonebarDetune_ = raw (ids::tonebarDetune);
+    damperRelease_ = raw (ids::damperRelease);
     humanizeAmount_ = raw (ids::humanize);
     fxp_ = { raw (ids::fxOn), raw (ids::fxVolume), raw (ids::fxDrive), raw (ids::fxEnvelope), raw (ids::fxBass), raw (ids::fxMid),
         raw (ids::fxMidFreq), raw (ids::fxTreble), raw (ids::panOn), raw (ids::panWave), raw (ids::panRate), raw (ids::panDepth),
@@ -62,59 +67,41 @@ tw::VoiceConfig PluginProcessor::wantedConfig() const
 {
     tw::VoiceConfig c;
     c.instrument = int (std::lround (instrument_->load()));
-    c.hardness = hardness_->load();
-    c.decay = decay_->load();
-    c.unison = unison_->load();
-    c.stretch = stretch_->load();
-    c.bankGeneration = bankGeneration_.load();
+    auto& v = c.voicing;
+    v.hardness = hardness_->load();
+    v.decay = decay_->load();
+    v.unison = unison_->load();
+    v.stretch = stretch_->load();
+    v.hammerMass = hammerMass_->load();
+    v.strikePoint = strikePoint_->load();
+    v.gauge = gauge_->load();
+    v.pickupGap = pickupGap_->load();
+    v.pickupOffset = pickupOffset_->load();
+    v.tonebarDetune = tonebarDetune_->load();
+    v.damperRelease = damperRelease_->load();
     return c;
 }
 
 static int64_t signatureOf (const tw::VoiceConfig& c)
 {
-    auto h = int64_t (c.instrument) * 1000003 + int64_t (c.bankGeneration) * 7919;
-    for (float v : { c.hardness, c.decay, c.unison, c.stretch })
+    auto h = int64_t (c.instrument) * 1000003;
+    for (float v : c.voicingValues())
         h = h * 31 + int64_t (std::lround (v * 100.0f));
     return h;
 }
 
 int64_t PluginProcessor::wantedSignature() const { return signatureOf (wantedConfig()); }
 
-std::shared_ptr<tw::BankImage> PluginProcessor::bankFor (int slot, int generation)
-{
-    if (generation != bankCacheGeneration_)
-    {
-        bankCache_.clear();
-        bankCacheGeneration_ = generation;
-    }
-    for (auto& b : bankCache_)
-        if (b->slot == slot)
-            return b;
-    const auto file = tw::findBank (slot);
-    if (file == juce::File())
-        return nullptr;
-    auto bank = std::make_shared<tw::BankImage> (file, slot);
-    if (!bank->valid())
-        return nullptr;
-    bankCache_.push_front (bank);
-    while (bankCache_.size() > 2) // the playing voices keep their own reference
-        bankCache_.pop_back();
-    return bank;
-}
-
 void PluginProcessor::build (const tw::VoiceConfig& config)
 {
-    pmp::Params p;
-    p.loadPreset (tw::instrumentId (config.instrument).toStdString());
-    const int slot = int (std::lround (p.hybridBank));
-    auto bank = p.hybridOn > 0.5f ? bankFor (slot, config.bankGeneration) : nullptr;
-
-    auto voice = std::make_unique<tw::InstrumentVoice> (config, std::move (bank));
+    auto voice = std::make_unique<tw::InstrumentVoice> (config);
     voice->prepare (hostRate_.load(), kChunk);
     {
         const juce::ScopedLock sl (statusLock_);
         status_ = voice->status();
     }
+    keyLo_.store (voice->lowestKey());
+    keyHi_.store (voice->highestKey());
     delete pending_.exchange (voice.release());
 }
 
@@ -139,7 +126,7 @@ void PluginProcessor::run()
         if (haveBuilt && want == built && !rebuild)
             continue;
         // an instrument switch at once; the voicing knobs once they rest for a moment (every change rebuilds the engine)
-        const bool switched = !haveBuilt || want.instrument != built.instrument || want.bankGeneration != built.bankGeneration;
+        const bool switched = !haveBuilt || want.instrument != built.instrument;
         if (!switched && !rebuild && now - changedAt < 250)
             continue;
         build (want);

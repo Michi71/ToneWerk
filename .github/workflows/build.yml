@@ -1,8 +1,8 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # SPDX-FileCopyrightText: 2026 Michi71
 # Build, test and validate ToneWerk on macOS, Linux and Windows (from the Pamplejuce template, without signing and IPP).
-# The banks (Git LFS, ~160 MB) are not checked out here: the LFS bandwidth of a private repository is small. Only a release
-# (tag v*) fetches them once and attaches them as a zip of their own.
+# The instruments need no banks at run time: the physical models compute everything, the synthkeys banks are compiled in
+# (engine/synthkeys/banks, generated into sources at build time).
 name: Build
 
 on:
@@ -76,13 +76,12 @@ jobs:
         uses: actions/checkout@v4
         with:
           submodules: recursive
-          lfs: false
 
       - name: Cache the build
         uses: mozilla-actions/sccache-action@v0.0.9
 
       - name: Configure
-        run: cmake -B ${{ env.BUILD_DIR }} -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} -DTONEWERK_DEV_BANKS=OFF -DCMAKE_C_COMPILER_LAUNCHER=sccache -DCMAKE_CXX_COMPILER_LAUNCHER=sccache ${{ matrix.extra-flags }} .
+        run: cmake -B ${{ env.BUILD_DIR }} -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} -DCMAKE_C_COMPILER_LAUNCHER=sccache -DCMAKE_CXX_COMPILER_LAUNCHER=sccache ${{ matrix.extra-flags }} .
 
       - name: Build
         run: cmake --build ${{ env.BUILD_DIR }} --config ${{ env.BUILD_TYPE }}
@@ -119,27 +118,10 @@ jobs:
           name: ${{ env.ARTIFACT_NAME }}
           path: ${{ env.ARTIFACTS_PATH }}/${{ env.ARTIFACT_NAME }}.zip
 
-  banks:
-    if: startsWith(github.ref, 'refs/tags/v')
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout with LFS
-        uses: actions/checkout@v4
-        with:
-          lfs: true
-      - name: Zip the banks
-        run: |
-          cp docs/BANKS.md banks/
-          cd banks && zip -9 ../ToneWerk-Banks.zip *.bank BANKS.md
-      - uses: actions/upload-artifact@v4
-        with:
-          name: ToneWerk-Banks
-          path: ToneWerk-Banks.zip
-
   release:
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
-    needs: [build, banks]
+    needs: [build]
     permissions:
       contents: write
     steps:

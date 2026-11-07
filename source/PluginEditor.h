@@ -1,12 +1,14 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // SPDX-FileCopyrightText: 2026 Michi71
-// PluginEditor.h - preset bar, instrument panel (choice, level, voicing), the effect sections, the keyboard E1-E7
+// PluginEditor.h - preset bar, instrument panel (choice, level, voicing), the effect sections, the keyboard of the instrument
 #pragma once
 
 #include "LookAndFeel.h"
 #include "PluginProcessor.h"
 
 #include <juce_audio_utils/juce_audio_utils.h>
+
+#include <map>
 
 namespace tw
 {
@@ -15,6 +17,7 @@ class Knob : public juce::Component
 {
 public:
     Knob (juce::AudioProcessorValueTreeState& state, const juce::String& id, const juce::String& name);
+    void setTitle (const juce::String& name) { label_.setText (name, juce::dontSendNotification); }
     void resized() override;
 
 private:
@@ -56,16 +59,16 @@ private:
     void confirm (const juce::String& title, const juce::String& message, const juce::String& yes, std::function<void()> then);
     void savePresetDialog();
     void deletePreset();
-    void showBankMenu();
     void resetVoicing();
     bool voicingIsNeutral() const;
+    void showInstrument(); // the voicing controls of the instrument's family and its keys
 
     PluginProcessor& processor_;
     tw::LookAndFeel lnf_;
     juce::TooltipWindow tooltips_ { this, 600 };
 
-    // header: preset bar and bank menu
-    juce::TextButton prevPreset_ { "<" }, nextPreset_ { ">" }, savePreset_, deletePreset_, banks_;
+    // header: preset bar
+    juce::TextButton prevPreset_ { "<" }, nextPreset_ { ">" }, savePreset_, deletePreset_;
     juce::ComboBox presetBox_;
     std::vector<tw::PresetManager::Entry> presetEntries_;
     juce::String shownPreset_;
@@ -75,7 +78,11 @@ private:
     juce::ComboBox instrumentBox_;
     std::unique_ptr<juce::AudioProcessorValueTreeState::ComboBoxAttachment> instrumentAttachment_;
     juce::Label status_;
-    std::unique_ptr<tw::Knob> volume_, humanize_, hardness_, decay_, unison_, stretch_;
+    std::unique_ptr<tw::Knob> volume_, humanize_;
+    std::map<juce::String, std::unique_ptr<tw::Knob>> voicing_; // every voicing control; the family's are shown
+    juce::StringArray shownVoicing_;
+    int shownFamily_ = -1;
+    std::pair<int, int> shownKeys_ { -1, -1 };
     juce::Rectangle<int> instrumentPanel_, voicingTitle_;
     juce::TextButton resetVoicing_ { "Reset" };
 
@@ -87,7 +94,6 @@ private:
     static constexpr size_t kReverbSection = 7; // the last section: not dimmed by the FX switch
 
     juce::MidiKeyboardComponent keyboard_;
-    std::unique_ptr<juce::FileChooser> chooser_;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (PluginEditor)
 };

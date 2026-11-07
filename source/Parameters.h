@@ -1,9 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // SPDX-FileCopyrightText: 2026 Michi71
-// Parameters.h - the plugin's parameters: instrument, level, voicing of the hybrid voices, the MK8 effect chain
+// Parameters.h - the plugin's parameters: instrument, level, voicing of the sound engines, the MK8 effect chain
 #pragma once
 
 #include <juce_audio_processors/juce_audio_processors.h>
+
+#include <sound_engine.h>
 
 namespace tw
 {
@@ -12,11 +14,19 @@ namespace ids
     // instrument and output
     inline constexpr const char* instrument = "instrument";
     inline constexpr const char* volume = "volume";
-    // voicing on the poles and layers of the bank (README "Voicing" of pmpiano); a change rebuilds the instrument
+    // voicing on top of the calibrated instrument (README "Voicing"); a change rebuilds the instrument. Hardness acts on every
+    // instrument, decay, unison and stretch on the hybrid voices (on their poles), the rest on the physical models
     inline constexpr const char* hardness = "voicing_hardness";
     inline constexpr const char* decay = "voicing_decay";
     inline constexpr const char* unison = "voicing_unison";
     inline constexpr const char* stretch = "voicing_stretch";
+    inline constexpr const char* hammerMass = "voicing_hammer_mass";
+    inline constexpr const char* strikePoint = "voicing_strike_point";
+    inline constexpr const char* gauge = "voicing_gauge";
+    inline constexpr const char* pickupGap = "voicing_pickup_gap";
+    inline constexpr const char* pickupOffset = "voicing_pickup_offset";
+    inline constexpr const char* tonebarDetune = "voicing_tonebar_detune";
+    inline constexpr const char* damperRelease = "voicing_damper_release";
     // the MK8 preamp and effect chain (pmp::Mk8Effects), in the units of the Rhodes V8 Pro plugin
     inline constexpr const char* fxOn = "fx_on";
     inline constexpr const char* fxVolume = "fx_volume";
@@ -56,9 +66,27 @@ namespace ids
     inline constexpr const char* humanize = "humanize";
 } // namespace ids
 
-// the instruments are the presets of the engine (pmp::Params::presetId)
+// The instruments: presets of the three sound engines. The index is the value of the instrument parameter (saved in projects
+// and presets), so new instruments go at the end.
+struct Instrument
+{
+    engines::Family family;
+    const char* preset; // the engine's preset id
+    const char* name;   // shown in the instrument choice
+    float trimDb;       // the plugin's level balance on top of the engine preset
+};
+const std::vector<Instrument>& instruments();
+const Instrument& instrument (int index); // clamped to the table
+int instrumentIndex (const juce::String& preset); // -1 if unknown
 juce::StringArray instrumentNames();
 juce::String instrumentId (int index);
+
+// the voicing controls of a family, in the order of the panel
+const juce::StringArray& voicingIds (engines::Family family);
+// every voicing control (the reset button)
+const juce::StringArray& allVoicingIds();
+// the short name of a voicing control on the panel of a family
+juce::String voicingLabel (const juce::String& id, engines::Family family);
 
 juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout();
 

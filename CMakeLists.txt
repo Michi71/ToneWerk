@@ -17,9 +17,6 @@ set(COMPANY_NAME "Michi71")
 set(BUNDLE_ID "de.michi71.tonewerk")
 set(FORMATS Standalone AU VST3)
 
-option(TONEWERK_DEV_BANKS "Let the build find the banks in its source tree (banks/)" ON)
-option(TONEWERK_BUNDLE_BANKS "Copy banks/*.bank into the built plugin bundles and next to the standalone app" OFF)
-
 set(CMAKE_POLICY_DEFAULT_CMP0141 NEW CACHE STRING "" FORCE)
 set(CMAKE_MSVC_DEBUG_INFORMATION_FORMAT Embedded CACHE STRING "" FORCE)
 
@@ -31,7 +28,7 @@ include(PamplejuceFunctions)
 add_subdirectory(JUCE)
 add_subdirectory(modules/clap-juce-extensions EXCLUDE_FROM_ALL)
 
-# the pmpiano engine (engine/UPSTREAM.md)
+# the sound engines pmtines, pmreeds, synthkeys and the MK8 effect chain (engine/UPSTREAM.md)
 add_subdirectory(engine)
 
 juce_add_plugin("${PROJECT_NAME}"
@@ -75,13 +72,11 @@ target_compile_definitions(SharedCode
     CMAKE_BUILD_TYPE="${CMAKE_BUILD_TYPE}"
     VERSION="${CURRENT_VERSION}"
     PRODUCT_NAME_WITHOUT_VERSION="ToneWerk")
-if(TONEWERK_DEV_BANKS)
-  target_compile_definitions(SharedCode INTERFACE TONEWERK_DEV_BANKS_DIR="${CMAKE_CURRENT_SOURCE_DIR}/banks")
-endif()
 
 target_link_libraries(SharedCode
     INTERFACE
-    pmpcore
+    soundengines
+    mk8fx
     juce_audio_utils
     juce_audio_processors
     juce_dsp
@@ -93,28 +88,6 @@ target_link_libraries(SharedCode
 
 target_link_libraries("${PROJECT_NAME}" PRIVATE SharedCode)
 
-# banks next to the binaries for a distribution (source/BankLocator.cpp searches there)
-if(TONEWERK_BUNDLE_BANKS)
-  file(GLOB BankFiles "${CMAKE_CURRENT_SOURCE_DIR}/banks/*.bank")
-  foreach(format ${FORMATS} CLAP)
-    set(target "${PROJECT_NAME}_${format}")
-    if(NOT TARGET ${target})
-      continue()
-    endif()
-    get_target_property(artefact ${target} JUCE_PLUGIN_ARTEFACT_FILE)
-    if(format STREQUAL "VST3" OR APPLE)
-      set(dest "${artefact}/Contents/Resources/banks")          # a bundle (VST3 on every platform, AU, CLAP and the app on macOS)
-    else()
-      set(dest "$<TARGET_FILE_DIR:${target}>/banks")            # the folder of the standalone executable or the .clap file
-    endif()
-    add_custom_command(TARGET ${target} POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E make_directory "${dest}"
-        COMMAND ${CMAKE_COMMAND} -E copy_if_different ${BankFiles} "${dest}"
-        VERBATIM)
-  endforeach()
-endif()
-
 pamplejuce_add_tests()
-target_compile_definitions(Tests PRIVATE TONEWERK_TEST_BANKS_DIR="${CMAKE_CURRENT_SOURCE_DIR}/banks")
 
 include(GitHubENV)

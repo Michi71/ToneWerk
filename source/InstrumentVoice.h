@@ -1,86 +1,96 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // SPDX-FileCopyrightText: 2026 Michi71
-// InstrumentVoice.h - one prepared pmpiano engine (one instrument) and the resampler from its rate to the host rate
+// InstrumentVoice.h - one prepared sound engine (one instrument) and the resampler from its rate to the host rate
 //
-// A hybrid bank plays at its own rate only (44.1 kHz for the free-library banks, 48 kHz for the grand), so the engine runs at
-// the bank's rate and a short windowed-sinc resampler (Resampler.h) converts to the host rate. Built and prepared off the audio
-// thread (InstrumentLoader); render() and the MIDI calls are real-time safe.
+// The physical models (pmtines, pmreeds) run at their calibration rate, 44.1 kHz, and a short windowed-sinc resampler
+// (Resampler.h) converts to the host rate; the hybrid voices (synthkeys) carry their banks to the host rate themselves. The
+// engines render mono; the voice hands the same signal to both channels. Built and prepared off the audio thread
+// (the loader thread); render() and the MIDI calls are real-time safe.
 #pragma once
 
 #include <juce_audio_basics/juce_audio_basics.h>
 
-#include <core/engine.h>
+#include <sound_engine.h>
 
 #include "Resampler.h"
 
+#include <array>
 #include <memory>
-#include <vector>
 
 namespace tw
 {
-// the bank image of one slot, 16-byte aligned, shared by the engines that play it
-struct BankImage
-{
-    BankImage (const juce::File& file, int slot);
-    ~BankImage();
-    bool valid() const { return data != nullptr; }
-
-    uint8_t* data = nullptr;
-    size_t size = 0;
-    int slot = 0;
-    juce::File file;
-
-    JUCE_DECLARE_NON_COPYABLE (BankImage)
-};
-
 // what an instrument is built from
 struct VoiceConfig
 {
     int instrument = 0;
-    float hardness = 0, decay = 0, unison = 0, stretch = 0;
-    int bankGeneration = 0; // bumped when the bank folder changes
+    engines::Voicing voicing;
+
+    // the voicing controls in a fixed order (comparison, signature)
+    std::array<float, 11> voicingValues() const
+    {
+        const auto& v = voicing;
+        return { v.hardness, v.hammerMass, v.strikePoint, v.gauge, v.pickupGap, v.pickupOffset, v.tonebarDetune, v.damperRelease,
+            v.decay, v.unison, v.stretch };
+    }
 
     bool operator== (const VoiceConfig& o) const
     {
-        return instrument == o.instrument && bankGeneration == o.bankGeneration && juce::exactlyEqual (hardness, o.hardness)
-            && juce::exactlyEqual (decay, o.decay) && juce::exactlyEqual (unison, o.unison) && juce::exactlyEqual (stretch, o.stretch);
+        if (instrument != o.instrument)
+            return false;
+        const auto a = voicingValues(), b = o.voicingValues();
+        for (size_t i = 0; i < a.size(); ++i)
+            if (!juce::exactlyEqual (a[i], b[i]))
+                return false;
+        return true;
     }
 };
-
-// the plugin's level trim of an instrument [dB], on top of the engine preset (out.gain)
-float outputTrimDb (const juce::String& instrument);
 
 class InstrumentVoice
 {
 public:
-    // Builds the engine of an instrument: the preset, the voicing, the bank (nullptr: none found). Not real-time safe.
-    InstrumentVoice (const VoiceConfig& config, std::shared_ptr<BankImage> bank);
+    // Builds the engine of an instrument with its voicing. Not real-time safe.
+    explicit InstrumentVoice (const VoiceConfig& config);
 
-    // host rate and the largest render() call; allocates. Not real-time safe.
+    // host rate and the largest render() call; prepares the engine and the resampler, allocates. Not real-time safe.
     void prepare (double hostRate, int maxFrames);
     double hostRate() const { return hostRate_; }
     int maxFrames() const { return maxFrames_; }
 
     // real time: n <= maxFrames frames at the host rate into left/right (overwritten)
     void render (float* left, float* right, int n);
-    void noteOn (int note, int velocity) { engine_->noteOn (note, velocity); }
-    void noteOff (int note) { engine_->noteOff (note); }
-    void controller (int cc, int value) { engine_->processMidiController (cc, value); }
-    void allNotesOff() { engine_->allNotesOff(); }
+    void noteOn (int note, int velocity)
+    {
+        if (engine_)
+            engine_->noteOn (note, velocity);
+    }
+    void noteOff (int note)
+    {
+        if (engine_)
+            engine_->noteOff (note);
+    }
+    void controller (int cc, int value)
+    {
+        if (engine_)
+            engine_->controller (cc, value);
+    }
+    void allNotesOff()
+    {
+        if (engine_)
+            engine_->allNotesOff();
+    }
 
     const VoiceConfig& config() const { return config_; }
     double engineRate() const { return engineRate_; }
-    pmp::Engine::HybridState hybridState() const { return engine_->hybridState(); }
-    bool silent() const { return silent_; }   // an instrument without a model and without its bank
+    bool silent() const { return engine_ == nullptr; } // the engine refused the preset (status says why)
     const juce::String& status() const { return status_; }
+    int lowestKey() const { return engine_ ? engine_->lowestKey() : 0; }
+    int highestKey() const { return engine_ ? engine_->highestKey() : 127; }
 
 private:
     VoiceConfig config_;
-    std::shared_ptr<BankImage> bank_;
-    std::unique_ptr<pmp::Engine> engine_;
-    double engineRate_ = 48000.0, hostRate_ = 0.0;
+    std::unique_ptr<engines::SoundEngine> engine_;
+    double engineRate_ = 44100.0, hostRate_ = 0.0;
     int maxFrames_ = 0;
-    bool silent_ = false;
     juce::String status_;
 
     Resampler resampler_;
