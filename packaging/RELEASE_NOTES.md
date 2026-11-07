@@ -20,6 +20,8 @@ are built in. **The separate bank download of 0.1.0 is no longer needed.**
 - **Voicing:** the physical models take the technician's controls (hardness, hammer mass, strike point, tine or reed gauge,
   pickup gap and offset, tonebar, damper); the hybrid voices take hardness, decay, unison and stretch. The panel shows the
   controls of the selected instrument, and the keyboard shows its keys.
+- **Voices:** a polyphony limit for slower computers (All, 64 … 8); over it the quietest voice fades out without a click.
+  On a current machine every key held with the pedal costs 4–9 % of one core, with 16 voices 2–4 %.
 - **MIDI learn:** right-click any control for *MIDI Learn*, *Forget CC* and *Clear all*. The assignments are saved with the
   project and in user presets.
 - **Program change:** a MIDI program change loads the factory preset of that number (standalone and AU; VST3 hosts may not
