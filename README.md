@@ -91,8 +91,10 @@ compiled into it. The engines render mono; the effect chain and the reverb make 
   presets: loading a user preset that carries assignments replaces the current ones, factory presets keep them. Works
   without a host (Standalone); in a host the parameter changes reach its automation. The parameters are set on the message
   thread a few milliseconds after the CC (`source/MidiLearn.*`).
-- **Program change**: the programs are the factory presets in the order of the list (program 0 is the first); a MIDI program
-  change loads that preset, also when it is the current one (back to its saved state). Bank select is ignored.
+- **Program change**: a MIDI program change loads the factory preset of that number in the order of the list (program 0 is the
+  first), also when it is the current one (back to its saved state). Bank select is ignored. The plugin offers the host no
+  program list (a VST3 host's own program list loaded presets over the restored state): in the standalone app and AU hosts
+  program changes arrive as MIDI; VST3 hosts may not pass them on.
 
 ## How it works
 

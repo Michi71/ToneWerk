@@ -153,19 +153,16 @@ TEST_CASE ("The MIDI assignments are part of the plugin state and of user preset
     dir.deleteRecursively();
 }
 
-TEST_CASE ("The programs are the factory presets; a program change loads one", "[midi][presets]")
+TEST_CASE ("A MIDI program change loads the factory preset of its number", "[midi][presets]")
 {
     PluginProcessor plugin;
     const auto names = plugin.presets().factoryNames();
-    REQUIRE (plugin.getNumPrograms() == names.size());
-    for (int i = 0; i < names.size(); ++i)
-        CHECK (plugin.getProgramName (i) == names[i]);
-    CHECK (plugin.getCurrentProgram() == 0);
+    // one program for the host: the factory presets as host programs broke pluginval's state restoration (VST3 "Program")
+    CHECK (plugin.getNumPrograms() == 1);
 
     send (plugin, { juce::MidiMessage::programChange (1, 3) });
     CHECK (plugin.presets().currentName() == names[3]);
     CHECK (plugin.presets().currentIsFactory());
-    CHECK (plugin.getCurrentProgram() == 3);
 
     // the preset's instrument and effects (Clavinet Funk: the drive)
     const int clav = names.indexOf ("Clavinet Funk");
@@ -178,13 +175,11 @@ TEST_CASE ("The programs are the factory presets; a program change loads one", "
     send (plugin, { juce::MidiMessage::programChange (1, 127) });
     CHECK (plugin.presets().currentName() == names[clav]);
 
-    // from the host; the host echoing the current program does not reset an edited preset
-    plugin.setCurrentProgram (5);
-    CHECK (plugin.presets().currentName() == names[5]);
+    // the same program again restores the preset after an edit
     auto* volume = plugin.state().getParameter (tw::ids::volume);
     volume->setValueNotifyingHost (0.2f);
-    plugin.setCurrentProgram (plugin.getCurrentProgram());
-    CHECK (near (volume->getValue(), 0.2f));
+    send (plugin, { juce::MidiMessage::programChange (1, clav) });
+    CHECK (!near (volume->getValue(), 0.2f));
 }
 
 TEST_CASE ("The MIDI learn menu", "[midi][editor]")

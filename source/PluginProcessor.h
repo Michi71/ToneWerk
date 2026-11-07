@@ -47,11 +47,13 @@ public:
     bool isMidiEffect() const override { return false; }
     double getTailLengthSeconds() const override { return 10.0; } // the longest reverb
 
-    // the programs are the factory presets
-    int getNumPrograms() override;
-    int getCurrentProgram() override;
-    void setCurrentProgram (int index) override;
-    const juce::String getProgramName (int index) override;
+    // One program for the host. The factory presets as host programs gave VST3 an automatable "Program" parameter that loads a
+    // preset over every other parameter, and pluginval's state restoration failed on it; a MIDI program change loads the
+    // factory preset inside the plugin instead (dispatchMidi).
+    int getNumPrograms() override { return 1; }
+    int getCurrentProgram() override { return 0; }
+    void setCurrentProgram (int) override {}
+    const juce::String getProgramName (int) override { return "ToneWerk"; }
     void changeProgramName (int, const juce::String&) override {}
 
     void getStateInformation (juce::MemoryBlock& destData) override;
@@ -95,7 +97,6 @@ private:
     tw::MidiLearn midiLearn_;
     juce::MidiKeyboardState keyboardState_;
     std::atomic<int> pendingProgram_ { -1 }; // audio -> message thread
-    int lastProgram_ = 0;                    // message thread: the program last chosen
 
     // parameters read on the audio and loader threads
     std::atomic<float>* instrument_ = nullptr;

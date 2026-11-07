@@ -391,34 +391,10 @@ void PluginProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::Midi
 void PluginProcessor::dispatchMidi()
 {
     midiLearn_.dispatch();
-    if (const int program = pendingProgram_.exchange (-1); program >= 0 && program < getNumPrograms())
-    {
-        // a program change from the keyboard loads the preset even when it is the current one (back to its saved state)
-        lastProgram_ = program;
+    // a MIDI program change loads the factory preset of that number, even when it is the current one (back to its saved state)
+    if (const int program = pendingProgram_.exchange (-1); program >= 0 && program < presets_.factoryNames().size())
         presets_.loadFactory (program);
-    }
 }
-
-int PluginProcessor::getNumPrograms() { return presets_.factoryNames().size(); }
-
-int PluginProcessor::getCurrentProgram()
-{
-    if (presets_.currentIsFactory())
-        if (const int index = presets_.factoryNames().indexOf (presets_.currentName()); index >= 0)
-            return index;
-    return lastProgram_; // a user preset or none: the program last chosen
-}
-
-void PluginProcessor::setCurrentProgram (int index)
-{
-    // hosts echo the current program back after restoring a project: that must not reset the parameters to the preset
-    if (index < 0 || index >= getNumPrograms() || index == getCurrentProgram())
-        return;
-    lastProgram_ = index;
-    presets_.loadFactory (index);
-}
-
-const juce::String PluginProcessor::getProgramName (int index) { return presets_.factoryNames()[index]; }
 
 // --- state ---------------------------------------------------------------------------------------------------------------
 
