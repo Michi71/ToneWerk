@@ -138,7 +138,9 @@ jobs:
           sparse-checkout: packaging
       - uses: softprops/action-gh-release@v2
         with:
-          prerelease: true
+          # a tag with a hyphen (v0.3.0-beta1) is a pre-release; a plain version is a release and becomes "Latest"
+          prerelease: ${{ contains(github.ref_name, '-') }}
+          make_latest: ${{ !contains(github.ref_name, '-') }}
           body_path: source/packaging/RELEASE_NOTES.md
           files: |
             */*.zip
