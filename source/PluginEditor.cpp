@@ -23,6 +23,7 @@ public:
         addAndMakeVisible (label_);
         if (auto* p = dynamic_cast<juce::AudioParameterChoice*> (state.getParameter (id)))
             box_.addItemList (p->choices, 1);
+        box_.attachMidiLearn (tw::learnui::of (state), id, name);
         addAndMakeVisible (box_);
         attachment_ = std::make_unique<juce::AudioProcessorValueTreeState::ComboBoxAttachment> (state, id, box_);
     }
@@ -35,7 +36,7 @@ public:
 
 private:
     juce::Label label_;
-    juce::ComboBox box_;
+    tw::Learnable<juce::ComboBox> box_;
     std::unique_ptr<juce::AudioProcessorValueTreeState::ComboBoxAttachment> attachment_;
 };
 
@@ -49,6 +50,7 @@ public:
         label_.setJustificationType (juce::Justification::centred);
         label_.setFont (juce::FontOptions (12.5f));
         addAndMakeVisible (label_);
+        button_.attachMidiLearn (tw::learnui::of (state), id, name);
         addAndMakeVisible (button_);
         attachment_ = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment> (state, id, button_);
     }
@@ -61,13 +63,82 @@ public:
 
 private:
     juce::Label label_;
-    juce::ToggleButton button_;
+    tw::Learnable<juce::ToggleButton> button_;
     std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> attachment_;
 };
 } // namespace
 
 namespace tw
 {
+namespace learnui
+{
+    MidiLearn* of (juce::AudioProcessorValueTreeState& state)
+    {
+        auto* processor = dynamic_cast<PluginProcessor*> (&state.processor);
+        return processor != nullptr ? &processor->midiLearn() : nullptr;
+    }
+
+    juce::PopupMenu menu (MidiLearn& learn, const String& parameterId)
+    {
+        juce::PopupMenu m;
+        const int cc = learn.ccFor (parameterId);
+        if (learn.learning() == parameterId)
+            m.addItem ("Cancel MIDI Learn", [&learn] { learn.cancelLearn(); });
+        else
+            m.addItem ("MIDI Learn", [&learn, parameterId] { learn.beginLearn (parameterId); });
+        if (cc >= 0)
+            m.addItem ("Forget CC " + String (cc), [&learn, parameterId] { learn.forget (parameterId); });
+        else
+            m.addItem ("Forget CC", false, false, nullptr);
+        m.addSeparator();
+        m.addItem ("Clear all", learn.size() > 0, false, [&learn] {
+            learn.cancelLearn();
+            learn.clear();
+        });
+        return m;
+    }
+
+    void showMenu (MidiLearn& learn, const String& parameterId, juce::Component& target)
+    {
+        auto m = menu (learn, parameterId);
+        m.setLookAndFeel (&target.getLookAndFeel());
+        m.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&target).withMousePosition());
+    }
+
+    String tooltip (const String& base, int cc, bool learning)
+    {
+        if (learning)
+            return base + " (MIDI Learn: move a controller)";
+        return cc >= 0 ? base + " (CC " + String (cc) + ")" : base;
+    }
+
+    // the CC in a small tag in the top right corner (a dot on a switch, the tag would cover it); learning: an outline
+    void paintHint (juce::Graphics& g, juce::Rectangle<int> bounds, int cc, bool learning, bool compact)
+    {
+        const auto r = bounds.toFloat();
+        if (learning)
+        {
+            g.setColour (colours::accent);
+            g.drawRoundedRectangle (r.reduced (1.0f), 4.0f, 1.5f);
+        }
+        if (compact)
+        {
+            g.setColour (colours::accent);
+            g.fillEllipse (r.getRight() - 6.0f, r.getY() + 1.0f, 5.0f, 5.0f);
+            return;
+        }
+        const String text = learning ? String ("LEARN") : "CC " + String (cc);
+        const juce::Font font (juce::FontOptions (9.5f, juce::Font::bold));
+        const float w = juce::GlyphArrangement::getStringWidth (font, text) + 8.0f;
+        const auto tag = juce::Rectangle<float> (r.getRight() - w - 1.0f, r.getY() + 1.0f, w, 12.0f);
+        g.setColour (learning ? colours::accent : colours::accentDim);
+        g.fillRoundedRectangle (tag, 3.0f);
+        g.setColour (learning ? colours::background : colours::text);
+        g.setFont (font);
+        g.drawText (text, tag, juce::Justification::centred);
+    }
+} // namespace learnui
+
 Knob::Knob (juce::AudioProcessorValueTreeState& state, const String& id, const String& name)
     : attachment_ (state, id, slider_)
 {
@@ -83,7 +154,7 @@ Knob::Knob (juce::AudioProcessorValueTreeState& state, const String& id, const S
         slider_.setDoubleClickReturnValue (true, double (p->convertFrom0to1 (p->getDefaultValue())));
         slider_.textFromValueFunction = [p] (double v) { return p->getText (p->convertTo0to1 (float (v)), 16); };
         slider_.updateText();
-        slider_.setTooltip (p->getName (64));
+        slider_.attachMidiLearn (learnui::of (state), id, p->getName (64));
     }
     label_.setText (name, juce::dontSendNotification);
     label_.setJustificationType (juce::Justification::centred);
@@ -103,8 +174,8 @@ Section::Section (const String& title, juce::AudioProcessorValueTreeState& state
 {
     if (switchId != nullptr)
     {
-        switch_ = std::make_unique<juce::ToggleButton>();
-        switch_->setTooltip (title + " on/off");
+        switch_ = std::make_unique<Learnable<juce::ToggleButton>>();
+        switch_->attachMidiLearn (learnui::of (state), switchId, title + " on/off");
         addAndMakeVisible (*switch_);
         switchAttachment_ = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment> (state, switchId, *switch_);
     }
@@ -185,6 +256,7 @@ PluginEditor::PluginEditor (PluginProcessor& p)
 
     // instrument
     instrumentBox_.addItemList (tw::instrumentNames(), 1);
+    instrumentBox_.attachMidiLearn (&p.midiLearn(), ids::instrument, "Instrument");
     addAndMakeVisible (instrumentBox_);
     instrumentAttachment_ = std::make_unique<juce::AudioProcessorValueTreeState::ComboBoxAttachment> (state, ids::instrument,
         instrumentBox_);
@@ -209,7 +281,7 @@ PluginEditor::PluginEditor (PluginProcessor& p)
 
     // effects
     fxOn_.setButtonText ("FX");
-    fxOn_.setTooltip ("Effect chain on/off");
+    fxOn_.attachMidiLearn (&p.midiLearn(), ids::fxOn, "Effect chain on/off");
     addAndMakeVisible (fxOn_);
     fxOnAttachment_ = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment> (state, ids::fxOn, fxOn_);
     auto knob = [&state] (const char* id, const char* name) { return std::make_unique<tw::Knob> (state, id, utf8 (name)); };

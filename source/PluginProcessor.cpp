@@ -13,7 +13,8 @@ PluginProcessor::PluginProcessor()
     : AudioProcessor (BusesProperties().withOutput ("Output", juce::AudioChannelSet::stereo(), true)),
       juce::Thread ("ToneWerk loader"),
       apvts_ (*this, nullptr, "ToneWerk", tw::createParameterLayout()),
-      presets_ (apvts_)
+      presets_ (apvts_),
+      midiLearn_ (apvts_)
 {
     auto raw = [this] (const char* id) {
         auto* p = apvts_.getRawParameterValue (id);
@@ -52,10 +53,12 @@ PluginProcessor::PluginProcessor()
     scratch_.setSize (5, kChunk);
     reverb_.prepare (48000.0);
     startThread (juce::Thread::Priority::normal);
+    startTimer (10);
 }
 
 PluginProcessor::~PluginProcessor()
 {
+    stopTimer();
     stopThread (4000);
     delete pending_.exchange (nullptr);
     delete retired_.exchange (nullptr);
@@ -202,8 +205,18 @@ void PluginProcessor::adoptPending()
 
 void PluginProcessor::handleMidi (const juce::MidiMessage& m)
 {
-    if (m.isController() && m.getControllerNumber() == 64)
-        sustain_ = m.getControllerValue();
+    if (m.isController())
+    {
+        if (m.getControllerNumber() == 64)
+            sustain_ = m.getControllerValue();
+        if (midiLearn_.handleController (m.getControllerNumber(), m.getControllerValue()))
+            return; // learned: it sets a parameter instead
+    }
+    else if (m.isProgramChange())
+    {
+        pendingProgram_.store (m.getProgramChangeNumber());
+        return;
+    }
     if (active_ == nullptr)
         return;
     if (m.isNoteOn())
@@ -372,6 +385,40 @@ void PluginProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::Midi
     for (int ch = 2; ch < buffer.getNumChannels(); ++ch)
         buffer.clear (ch, 0, n);
 }
+
+// --- message thread: MIDI that changes the plugin --------------------------------------------------------------------------
+
+void PluginProcessor::dispatchMidi()
+{
+    midiLearn_.dispatch();
+    if (const int program = pendingProgram_.exchange (-1); program >= 0 && program < getNumPrograms())
+    {
+        // a program change from the keyboard loads the preset even when it is the current one (back to its saved state)
+        lastProgram_ = program;
+        presets_.loadFactory (program);
+    }
+}
+
+int PluginProcessor::getNumPrograms() { return presets_.factoryNames().size(); }
+
+int PluginProcessor::getCurrentProgram()
+{
+    if (presets_.currentIsFactory())
+        if (const int index = presets_.factoryNames().indexOf (presets_.currentName()); index >= 0)
+            return index;
+    return lastProgram_; // a user preset or none: the program last chosen
+}
+
+void PluginProcessor::setCurrentProgram (int index)
+{
+    // hosts echo the current program back after restoring a project: that must not reset the parameters to the preset
+    if (index < 0 || index >= getNumPrograms() || index == getCurrentProgram())
+        return;
+    lastProgram_ = index;
+    presets_.loadFactory (index);
+}
+
+const juce::String PluginProcessor::getProgramName (int index) { return presets_.factoryNames()[index]; }
 
 // --- state ---------------------------------------------------------------------------------------------------------------
 
