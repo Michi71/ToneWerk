@@ -62,7 +62,7 @@ void Engine::updateHybrid() {
     if (!hybridBank_.valid()) {
         std::string err;
         if (!hybridBank_.attach(img.data, img.size, &err)) {
-            std::fprintf(stderr, "synthkeys: %s\n", err.c_str());
+            std::fprintf(stderr, "hybrid bank: %s\n", err.c_str());
             hybrid_.reset();
             return;
         }
