@@ -6,7 +6,7 @@ ToneWerk changes none of their sources and only builds them (`engine/CMakeLists.
 | Folder | Source | Version | Instruments |
 |---|---|---|---|
 | `tines/src/core` | `Michi71/pmtines` `src/core` (without the C API `capi*`) | `ee19372e4648c77d43a811e39c83a4bf09e6a4e1` (2026-11-04) | Rhodes Mark I, Mark II, Mark V, Mark 7, Mark 8, Sparkle Top: physical models |
-| `reeds/src/core` | `Michi71/pmreeds` `src/core` (without `capi*`) | `f9a8ca6eb07e66c69626afc7547a6667e9bf694f` (2026-11-04) | Wurlitzer 200A, Hohner Pianet T: physical models |
+| `reeds/src/core` | `Michi71/pmreeds` `src/core` (without `capi*`) | `a85331896c081a9a9f16fc771f26d0a1ac4d4751` (2026-11-07: a NaN reed position no longer indexes the pickup table out of bounds) | Wurlitzer 200A, Hohner Pianet T: physical models |
 | `synthkeys/src/core` | `synthkeys` `src/core` (without `capi*` and the generated `hybrid_*_bank.cpp`) | working tree of 2026-11-07, no commit yet | Hohner Clavinet D6, Splendid Grand, Salamander Grand, Upright Piano KW: hybrid voices |
 | `synthkeys/banks` | `synthkeys` `out/bank/{splendid,clav,upright,salamander}.bank` | the images embedded in that working tree (CRC-32 in the `hybrid_*_bank.h` headers: b00748e0, 2ef67e42, 350743e5, 0ec9521e) | the banks of the hybrid voices |
 | `fx/src/core` | `Michi71/pmpiano` `src/core`: `mk8_fx.*`, `config.h`, `dsp.h` | `0201eccd890a6c8d6fc25689f123810c774fe0ca` (2026-10-25) | the MK8 preamp and effect chain, the soft clip |

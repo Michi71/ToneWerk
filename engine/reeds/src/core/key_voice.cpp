@@ -755,7 +755,9 @@ namespace {
 PMP_INLINE real splineEval(const float* y, const float* m, int n, real u0, real du, real u) {
     real p = (u - u0) / du;
     const real top = real(n - 1) - real(1e-4);
-    p = p < real(0) ? real(0) : p > top ? top : p;
+    // NaN fails both bounds, and int(NaN) is INT_MIN on x86 (0 on ARM): a reed that ran away (extreme voicing) read far
+    // outside the table and crashed. Written so that NaN lands on the first knot.
+    p = p >= real(0) ? (p > top ? top : p) : real(0);
     const int i = int(p);
     const real t = p - real(i), a = real(1) - t;
     const real h2 = du * du * (real(1) / real(6));
