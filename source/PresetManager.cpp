@@ -36,8 +36,10 @@ namespace
             { "Wurlitzer Chorus", "wurli", { { ids::fxOn, 1 }, { ids::panOn, 0 }, { ids::chorusOn, 1 }, { ids::chorusRate, 0.8f },
                                                { ids::chorusDepth, 3 }, { ids::delayMix, 15 } } },
             { "Pianet T", "pianet", {} },
+            // 4 dB down: drive, compressor make-up and the mid boost brought it to the soft clip even when played softly
             { "Clavinet Funk", "clavinet", { { ids::fxOn, 1 }, { ids::panOn, 0 }, { ids::delayOn, 0 }, { ids::fxDrive, 40 },
-                                               { ids::compAmount, 60 }, { ids::fxMid, 4 }, { ids::fxMidFreq, 1200 } } },
+                                               { ids::compAmount, 60 }, { ids::fxMid, 4 }, { ids::fxMidFreq, 1200 },
+                                               { ids::volume, -4 } } },
             // the pianos in a room
             { "Splendid Grand", "splendid_hybrid", { { ids::reverbOn, 1 }, { ids::reverbMix, 24 }, { ids::reverbSize, 60 },
                                                        { ids::reverbDecay, 2.2f }, { ids::reverbDamping, 45 }, { ids::reverbPredelay, 20 } } },
