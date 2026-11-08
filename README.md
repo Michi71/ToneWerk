@@ -1,6 +1,8 @@
 # ToneWerk
 
-![ToneWerk: preset bar, instrument and voicing, the MK8 effect chain and reverb, the keyboard of the instrument](docs/images/tonewerk.png)
+[![ToneWerk: preset bar, instrument and voicing, the MK8 effect chain and reverb, the keyboard of the instrument – click for the video](docs/images/tonewerk.png)](https://youtu.be/U0xUk3iMI5s)
+
+▶ [Watch the video](https://youtu.be/U0xUk3iMI5s): the factory presets one after the other, three minutes.
 
 Electric and acoustic keyboards as a plugin and standalone app, with an MK8 effect chain: the Rhodes Mark I, Mark II, Mark V,
 Mark 7, Mark 8 and Sparkle Top and the Wurlitzer 200A and Hohner Pianet T (physical models), and the Hohner Clavinet D6, the
