@@ -46,7 +46,7 @@ CMake options:
 | Reed pianos | Wurlitzer 200A, Hohner Pianet T | physical model: hammer or pad, reed, electrostatic or magnetic pickup |
 | Hybrid | Hohner Clavinet D6, Splendid Grand Piano, Salamander Grand Piano, Upright Piano KW | hybrid: a short PCM attack crossfades into 48 computed modes per key |
 
-Nothing has to be installed besides the plugin: the physical models compute everything, and the banks of the hybrid voices (38 MB) are
+Nothing has to be installed besides the plugin: the physical models compute everything, and the banks of the hybrid voices (37 MB) are
 compiled into it. The engines render mono; the effect chain and the reverb make the stereo image.
 
 ## Usage
