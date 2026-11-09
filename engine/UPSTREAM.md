@@ -5,10 +5,10 @@ non-public code bases; ToneWerk changes none of their sources and only builds th
 
 | Folder | Contents | Version | Instruments |
 |---|---|---|---|
-| `tines/src/core` | the Rhodes engine (without its C API) | `f9edeeebab9c470a5e3d9c507cd6b9c64e952fb3` (2026-11-07: the preset comments stay out of the binary) | Rhodes Mark I, Mark II, Mark V, Mark 7, Mark 8, Sparkle Top: physical models |
+| `tines/src/core` | the Rhodes engine (without its C API) | `4a88a60e03523698515fff3186c7bde2850a8cb9` (2026-11-09: the upper tonebar is muted where it clicks, in Mark I, Mark V and Mark 7) | Rhodes Mark I, Mark II, Mark V, Mark 7, Mark 8, Sparkle Top: physical models |
 | `reeds/src/core` | the reed engine (without its C API) | `d5b9e804a0f10a453feda2daa06a1269a157bd7c` (2026-11-07: the preset comments stay out of the binary) | Wurlitzer 200A, Hohner Pianet T: physical models |
-| `hybrid/src/core` | the hybrid engine (without its C API and the generated `hybrid_*_bank.cpp`) | `b7907de761be40acb0d4b1ed21b99037379e0dcd` (2026-11-07: the preset comments stay out of the binary) | Hohner Clavinet D6, Splendid Grand, Salamander Grand, Upright Piano KW: hybrid voices |
-| `hybrid/banks` | the bank images of the hybrid engine | the images of that state (CRC-32 in the `hybrid_*_bank.h` headers: b00748e0, 2ef67e42, 350743e5, 0ec9521e) | the banks of the hybrid voices |
+| `hybrid/src/core` | the hybrid engine (without its C API and the generated `hybrid_*_bank.cpp`) | `b7907de761be40acb0d4b1ed21b99037379e0dcd` (2026-11-07: the preset comments stay out of the binary) with `hybrid_splendid_bank.h` of `67415bdf1955a64986ca46c8cc99694f057bb0b5` (2026-11-09: the Splendid bank rebuilt from sources transposed to each key's pitch) | Hohner Clavinet D6, Splendid Grand, Salamander Grand, Upright Piano KW: hybrid voices |
+| `hybrid/banks` | the bank images of the hybrid engine | the images of that state (CRC-32 in the `hybrid_*_bank.h` headers: 9c61df53, 2ef67e42, 350743e5, 0ec9521e) | the banks of the hybrid voices |
 | `fx/src/core` | the MK8 preamp and effect chain: `mk8_fx.*`, `config.h`, `dsp.h` | `0201eccd890a6c8d6fc25689f123810c774fe0ca` (2026-10-25) | the effect chain, the soft clip |
 
 ## How they are built
@@ -20,7 +20,7 @@ non-public code bases; ToneWerk changes none of their sources and only builds th
   namespace) and offer the engines through `adapters/sound_engine.h`, which names none of them. The plugin includes only that
   header (and `core/mk8_fx.h`, `core/dsp.h` of the effect chain).
 - **The hybrid banks.** The hybrid engine compiles its banks into itself as generated sources (`hybrid_*_bank.cpp`). As text
-  they are 30–110 MB each, over GitHub's file limit. ToneWerk keeps the bank images (`hybrid/banks`, 38 MB) and generates the
+  they are 30–110 MB each, over GitHub's file limit. ToneWerk keeps the bank images (`hybrid/banks`, 37 MB) and generates the
   same arrays at build time with `tools/embed_bank.cpp`; the headers `hybrid_*_bank.h` are the engine's own.
 - **Rates.** The Rhodes and reed engines run at 44.1 kHz, the rate their presets are calibrated and auto-voiced at; the
   plugin's resampler converts to the host rate. The hybrid engine runs at the host rate and resamples its banks itself.
