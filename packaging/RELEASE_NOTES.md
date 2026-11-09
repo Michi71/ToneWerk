@@ -1,48 +1,29 @@
-New instruments: twelve electric and acoustic keyboards, physical models and hybrid voices, with the MK8 effect chain, MIDI
-learn and a new icon.
+A maintenance release: a tuning fix for the Splendid Grand, quieter attacks on three Rhodes models and a preset level.
 
-![ToneWerk](https://github.com/Michi71/ToneWerk/raw/v0.2.0/docs/images/tonewerk.png)
+![ToneWerk](https://github.com/Michi71/ToneWerk/raw/v0.2.1/docs/images/tonewerk.png)
 
-## Instruments
-
-| Instruments | Voice |
-|---|---|
-| Rhodes Mark I, Mark II, Mark V, Mark 7, Mark 8, Sparkle Top | physical model: hammer, tine with tonebar, pickup, calibrated key by key |
-| Wurlitzer 200A, Hohner Pianet T | physical model: hammer or pad, reed, electrostatic or magnetic pickup |
-| Hohner Clavinet D6, Splendid Grand Piano, Salamander Grand Piano, Upright Piano KW | hybrid: a short sampled attack crossfades into 48 computed modes per key |
-
-Nothing has to be installed besides the plugin: the physical models compute everything, and the banks of the hybrid voices
-are built in. **The separate bank download of 0.1.0 is no longer needed.**
+▶ [Watch the video](https://youtu.be/U0xUk3iMI5s): the factory presets one after the other, three minutes.
 
 ## What is new
 
-- **Instruments:** all of them are new (see above). The instruments of 0.1.0 are gone.
-- **Voicing:** the physical models take the technician's controls (hardness, hammer mass, strike point, tine or reed gauge,
-  pickup gap and offset, tonebar, damper); the hybrid voices take hardness, decay, unison and stretch. The panel shows the
-  controls of the selected instrument, and the keyboard shows its keys.
-- **Voices:** a polyphony limit for slower computers (All, 64 … 8); over it the quietest voice fades out without a click.
-  On a current machine every key held with the pedal costs 4–9 % of one core, with 16 voices 2–4 %.
-- **MIDI learn:** right-click any control for *MIDI Learn*, *Forget CC* and *Clear all*. The assignments are saved with the
-  project and in user presets.
-- **Program change:** a MIDI program change loads the factory preset of that number (standalone and AU; VST3 hosts may not
-  pass program changes on).
-- **Factory presets:** 14 presets for the new instruments.
-- **Icon:** ToneWerk has its own icon.
-- **Unchanged:** the MK8 effect chain, the reverb, Humanize, the volume limiter and the user presets.
+- **Splendid Grand Piano:** B♭4 was out of tune: its fundamental was split in two and the tail ended about two thirds of a
+  semitone flat. The bank is rebuilt from recordings transposed to each key's pitch, which also removes a smaller detune
+  between the velocity layers of a few other keys.
+- **Rhodes Mark I, Mark V, Mark 7:** a click in the attack of some keys in the upper middle range is gone (the upper tonebar
+  mode is muted there).
+- **Factory preset Clavinet Funk:** 4 dB quieter; it reached the soft clip even when played softly.
+- **Demo:** `demo/ToneWerk-Demo.mid` in the repository walks through the factory presets (the MIDI file of the video).
 
-## Upgrading from 0.1.0
-
-Projects and user presets saved with 0.1.0 load, but **the instrument they name is now a different one** (the instrument is
-saved by its position in the list, and the list is new). Choose the instrument again; the effects and the reverb keep their
-settings.
+Projects and user presets of 0.2.0 load unchanged. For everything that came with 0.2.0 (the instruments, voicing, MIDI
+learn) see the [notes of 0.2.0](https://github.com/Michi71/ToneWerk/releases/tag/v0.2.0).
 
 ## Downloads
 
 | File | Contents |
 |---|---|
-| `ToneWerk-0.2.0-macOS.zip` | VST3, AU, CLAP, Standalone – universal (Apple Silicon and Intel), macOS 11+ |
-| `ToneWerk-0.2.0-Windows.zip` | VST3, CLAP, Standalone (x64) |
-| `ToneWerk-0.2.0-Linux.zip` | VST3, CLAP, Standalone (x64) |
+| `ToneWerk-0.2.1-macOS.zip` | VST3, AU, CLAP, Standalone – universal (Apple Silicon and Intel), macOS 11+ |
+| `ToneWerk-0.2.1-Windows.zip` | VST3, CLAP, Standalone (x64) |
+| `ToneWerk-0.2.1-Linux.zip` | VST3, CLAP, Standalone (x64) |
 
 Each zip contains the licence (`LICENSE.txt`) and the credits of the recordings the hybrid voices are built from
 (`CREDITS.md`).
