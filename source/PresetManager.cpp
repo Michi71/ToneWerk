@@ -23,18 +23,19 @@ namespace
     {
         static const std::vector<Factory> presets {
             { "Mark I Stage", "mark1", {} },
+            // the effect presets 2-3.5 dB down: a chord at velocity 100 already had the limiter working ("[.presetlevels]")
             { "Mark I Vari-Pan", "mark1", { { ids::fxOn, 1 }, { ids::panOn, 1 }, { ids::panRate, 3.5f }, { ids::panDepth, 70 },
-                                              { ids::delayOn, 0 } } },
+                                              { ids::delayOn, 0 }, { ids::volume, -3 } } },
             { "Mark II Phaser", "mark2", { { ids::fxOn, 1 }, { ids::panOn, 0 }, { ids::phaserOn, 1 }, { ids::phaserRate, 0.6f },
-                                             { ids::phaserDepth, 60 }, { ids::delayMix, 15 } } },
+                                             { ids::phaserDepth, 60 }, { ids::delayMix, 15 }, { ids::volume, -2 } } },
             { "Mark V", "mark5", {} },
             { "Mark 7 Chorus", "mark7", { { ids::fxOn, 1 }, { ids::panOn, 0 }, { ids::chorusOn, 1 }, { ids::chorusRate, 0.7f },
-                                            { ids::chorusDepth, 2.5f }, { ids::delayMix, 15 } } },
-            { "Mark 8 (MK8 chain)", "mark8", { { ids::fxOn, 1 } } },
+                                            { ids::chorusDepth, 2.5f }, { ids::delayMix, 15 }, { ids::volume, -3.5f } } },
+            { "Mark 8 (MK8 chain)", "mark8", { { ids::fxOn, 1 }, { ids::volume, -2.5f } } },
             { "Sparkle Top", "sparkletop", {} },
             { "Wurlitzer 200A", "wurli", {} },
             { "Wurlitzer Chorus", "wurli", { { ids::fxOn, 1 }, { ids::panOn, 0 }, { ids::chorusOn, 1 }, { ids::chorusRate, 0.8f },
-                                               { ids::chorusDepth, 3 }, { ids::delayMix, 15 } } },
+                                               { ids::chorusDepth, 3 }, { ids::delayMix, 15 }, { ids::volume, -3.5f } } },
             { "Pianet T", "pianet", {} },
             // 4 dB down: drive, compressor make-up and the mid boost brought it to the soft clip even when played softly
             { "Clavinet Funk", "clavinet", { { ids::fxOn, 1 }, { ids::panOn, 0 }, { ids::delayOn, 0 }, { ids::fxDrive, 40 },
