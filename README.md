@@ -67,14 +67,14 @@ compiled into it. The engines render mono; the effect chain and the reverb make 
   rate).
 - **Velocity** (−100 … +100 %, default 0 %): fits the plugin to the keyboard. A power curve bends the velocity of every
   note-on before the strike variation: positive values make a light touch play louder (velocity 64 plays as 90 at +100 %),
-  negative ones make it softer (64 plays as 32 at −100 %); the softest and the hardest strike stay where they are. It
-  belongs to the keyboard, not to a sound: presets neither store nor change it (a project saves it).
+  negative ones make it softer (64 plays as 32 at −100 %); the softest and the hardest strike stay where they are.
+  Presets store it like every other control.
 - **Transpose** (−12 … +12 semitones) and **Tune** (−100 … +100 cents), in the header: Transpose shifts the keys (the
   keyboard shows the keys that play; a held key releases the note it struck even when the value changes meanwhile). Tune
   moves the pitch of the whole instrument, to a band's or a recording's reference: the rate conversion plays the engine's
   output that much faster or slower, so the decay times change with it by 6 % at most, and a hybrid voice passes the
   resampler too while Tune is not 0. A change of Tune rebuilds the instrument like a voicing control (sounding notes ring
-  out at the old pitch). Like Velocity, both are the player's settings: presets neither store nor change them.
+  out at the old pitch). Presets store both.
 - **Voices** (polyphony): *All* (default) or a limit of 64 … 8 keys for slower computers. Over the limit a new key makes the
   quietest voice fade out in 20–30 ms without a click (a released key before a held one). Changing it rebuilds the instrument.
   Measured on an Apple M4 Max at 48 kHz with the effect chain and the reverb on, every key held with the pedal costs 4–9 % of

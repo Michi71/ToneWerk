@@ -840,7 +840,7 @@ TEST_CASE ("The velocity curve bends the middle and keeps the ends", "[velocity]
     CHECK (tw::velocityCurve (64, -1.0) == 32);
 }
 
-TEST_CASE ("The velocity curve changes how loud a touch plays and survives presets", "[velocity][presets]")
+TEST_CASE ("The velocity curve changes how loud a touch plays and presets store it", "[velocity][presets]")
 {
     PluginProcessor plugin;
     plugin.setRateAndBufferSizeDetails (48000.0, 512);
@@ -875,18 +875,20 @@ TEST_CASE ("The velocity curve changes how loud a touch plays and survives prese
     CHECK (light > 1.2 * linear);
     CHECK (heavy < 0.8 * linear);
 
-    // it belongs to the keyboard, not to a sound: presets leave it where it is
+    // a preset stores it like every parameter; one without it sets the default
     auto& presets = plugin.presets();
-    const auto dir = juce::File::createTempFile ("tonewerk-presets");
-    presets.setFolder (dir);
+    presets.setFolder (juce::File::createTempFile ("tonewerk-presets"));
     setParam (plugin, tw::ids::velocityCurve, 40.0f);
+    setParam (plugin, tw::ids::transpose, -12.0f);
+    setParam (plugin, tw::ids::tune, -31.8f);
     REQUIRE (presets.save ("Curve"));
-    CHECK_FALSE (dir.getChildFile ("Curve.twpreset").loadFileAsString().contains (tw::ids::velocityCurve));
-    setParam (plugin, tw::ids::velocityCurve, -25.0f);
-    REQUIRE (presets.loadFactory (1));
-    CHECK (std::abs (plugin.state().getRawParameterValue (tw::ids::velocityCurve)->load() + 25.0f) < 0.01f);
+    REQUIRE (presets.loadFactory (0));
+    CHECK (std::abs (plugin.state().getRawParameterValue (tw::ids::velocityCurve)->load()) < 0.01f);
+    CHECK (std::abs (plugin.state().getRawParameterValue (tw::ids::transpose)->load()) < 0.01f);
     REQUIRE (presets.loadUser ("Curve"));
-    CHECK (std::abs (plugin.state().getRawParameterValue (tw::ids::velocityCurve)->load() + 25.0f) < 0.01f);
+    CHECK (std::abs (plugin.state().getRawParameterValue (tw::ids::velocityCurve)->load() - 40.0f) < 0.01f);
+    CHECK (std::abs (plugin.state().getRawParameterValue (tw::ids::transpose)->load() + 12.0f) < 0.01f);
+    CHECK (std::abs (plugin.state().getRawParameterValue (tw::ids::tune)->load() + 31.8f) < 0.01f);
 }
 
 namespace
@@ -1148,4 +1150,50 @@ TEST_CASE ("Every control explains itself in its tooltip", "[parameters][editor]
     }
     plugin.editorBeingDeleted (editor);
     delete editor;
+}
+
+// the level of every factory preset (hidden: ./Tests "[.presetlevels]"): a four-note chord at velocity 100 and at 127, the
+// output peak and the most the limiter took away
+TEST_CASE ("Factory preset levels", "[.presetlevels]")
+{
+    PluginProcessor plugin;
+    plugin.setRateAndBufferSizeDetails (48000.0, 512);
+    plugin.prepareToPlay (48000.0, 512);
+    const auto names = plugin.presets().factoryNames();
+    for (int i = 0; i < names.size(); ++i)
+    {
+        juce::String line = names[i].paddedRight (' ', 26);
+        for (const int velocity : { 100, 127 })
+        {
+            REQUIRE (plugin.presets().loadFactory (i));
+            setParam (plugin, tw::ids::humanize, 0.0f);
+            REQUIRE (waitForInstrumentAlone (plugin, 512));
+            juce::AudioBuffer<float> buffer (2, 512);
+            for (int b = 0; b < 100; ++b) // the tail of the chord before
+            {
+                juce::MidiBuffer none;
+                plugin.processBlock (buffer, none);
+            }
+            plugin.takeOutputLevel();
+            double sum = 0.0;
+            for (int b = 0; b < 190; ++b)
+            {
+                juce::MidiBuffer midi;
+                if (b == 0)
+                    for (const int note : { 48, 55, 60, 64 })
+                        midi.addEvent (juce::MidiMessage::noteOn (1, note, (juce::uint8) velocity), 0);
+                if (b == 140)
+                    midi.addEvent (juce::MidiMessage::allNotesOff (1), 0);
+                buffer.clear();
+                plugin.processBlock (buffer, midi);
+                if (b < 140)
+                    sum += double (buffer.getRMSLevel (0, 0, 512)) * buffer.getRMSLevel (0, 0, 512);
+            }
+            const auto level = plugin.takeOutputLevel();
+            line << "  v" << velocity << ": rms " << juce::String (10.0 * std::log10 (sum / 140.0 + 1e-12), 1) << " dB, peak "
+                 << juce::String (juce::Decibels::gainToDecibels (std::max (level.left, level.right)), 1) << " dB, limiter "
+                 << juce::String (juce::Decibels::gainToDecibels (level.limiterGain), 1) << " dB";
+        }
+        WARN (line);
+    }
 }

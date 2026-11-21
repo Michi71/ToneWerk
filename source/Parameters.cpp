@@ -118,11 +118,10 @@ juce::String parameterHelp (const juce::String& id, Family family)
         { ids::instrument, "The instrument. A switch builds it in the background; the previous one fades out." },
         { ids::volume, "Output level after the effects. A limiter and a soft clip follow: watch the meter." },
         { ids::humanize, "Strike variation: every note-on's velocity scatters a little, so no two strikes are the same." },
-        { ids::velocityCurve, "Fits the plugin to your keyboard: positive values make a light touch play louder, negative ones softer. "
-                              "Presets do not change it." },
+        { ids::velocityCurve, "Bends the velocity: positive values make a light touch play louder, negative ones softer." },
         { ids::polyphony, "The most keys that sound at once, for slower computers. Over the limit the quietest voice fades out." },
-        { ids::transpose, "Shifts the keys by semitones. Presets do not change it." },
-        { ids::tune, "The pitch of the whole instrument in cents, to a band's or a recording's reference. Presets do not change it." },
+        { ids::transpose, "Shifts the keys by semitones." },
+        { ids::tune, "The pitch of the whole instrument in cents, to a band's or a recording's reference." },
         { ids::hardness, hybrid ? "Hammer hardness: the timbre of a harder or softer strike (32 velocity steps per 100 %)."
                                 : "Hardness of the hammer tip or felt: +100 % halves the contact time, a brighter attack." },
         { ids::hammerMass, "Hammer weight (the Pianet: how firmly the pad sticks): heavier strikes longer and darker." },
@@ -298,7 +297,7 @@ Layout createParameterLayout()
         polyphonyChoices(), 0));
     layout.add (std::move (engine));
 
-    // the player's keyboard, not the sound: presets leave it alone (isPlayerSetting)
+    // how the instrument answers the player: the velocity curve, transpose, tune (presets store them like every parameter)
     auto player = std::make_unique<juce::AudioProcessorParameterGroup> ("player", "Player", "|");
     player->addChild (number (ids::velocityCurve, "Velocity Curve", { -100.0f, 100.0f, 1.0f }, 0.0f, "%", 0));
     player->addChild (number (ids::transpose, "Transpose", { -12.0f, 12.0f, 1.0f }, 0.0f, "st", 0));
@@ -307,8 +306,6 @@ Layout createParameterLayout()
 
     return layout;
 }
-
-bool isPlayerSetting (const juce::String& id) { return id == ids::velocityCurve || id == ids::transpose || id == ids::tune; }
 
 const juce::StringArray& allParameterIds()
 {

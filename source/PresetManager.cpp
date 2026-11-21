@@ -47,6 +47,59 @@ namespace
                                                     { ids::reverbDecay, 2.4f }, { ids::reverbDamping, 45 }, { ids::reverbPredelay, 22 } } },
             { "Upright Piano", "upright", { { ids::reverbOn, 1 }, { ids::reverbMix, 15 }, { ids::reverbSize, 35 },
                                               { ids::reverbDecay, 1.2f }, { ids::reverbDamping, 55 }, { ids::reverbPredelay, 8 } } },
+            // since 0.3: voicing, the velocity curve, transpose and tune in use (new ones go at the end: the place in the
+            // list is the MIDI program)
+            { "Mark I Bark", "mark1", { { ids::hardness, 60 }, { ids::pickupOffset, 0.35f }, { ids::pickupGap, -30 },
+                                         { ids::velocityCurve, -15 }, { ids::fxOn, 1 }, { ids::panOn, 0 }, { ids::delayOn, 0 },
+                                         { ids::fxDrive, 35 }, { ids::fxTreble, 5 }, { ids::fxBass, -2 }, { ids::volume, -3 } } },
+            { "Mark I Ballad", "mark1", { { ids::hardness, -80 }, { ids::pickupGap, 80 }, { ids::velocityCurve, 25 },
+                                           { ids::humanize, 60 }, { ids::reverbOn, 1 }, { ids::reverbMix, 22 },
+                                           { ids::reverbSize, 55 }, { ids::reverbDecay, 2.0f }, { ids::reverbPredelay, 25 } } },
+            { "Mark II Suitcase Tremolo", "mark2", { { ids::fxOn, 1 }, { ids::panOn, 1 }, { ids::panWave, 3 }, { ids::panRate, 5.5f },
+                                                      { ids::panDepth, 60 }, { ids::delayOn, 0 }, { ids::fxDrive, 15 },
+                                                      { ids::fxBass, 4 }, { ids::volume, -1.5f } } },
+            { "Mark V Glass", "mark5", { { ids::hardness, 40 }, { ids::strikePoint, 40 }, { ids::fxOn, 1 }, { ids::panOn, 0 },
+                                          { ids::delayOn, 0 }, { ids::fxDrive, 10 }, { ids::chorusOn, 1 }, { ids::chorusRate, 0.5f },
+                                          { ids::chorusDepth, 2 }, { ids::reverbOn, 1 }, { ids::reverbMix, 18 },
+                                          { ids::reverbDecay, 1.8f }, { ids::volume, -1.5f } } },
+            { "Sparkle Top Dream", "sparkletop", { { ids::fxOn, 1 }, { ids::panOn, 0 }, { ids::fxDrive, 10 }, { ids::chorusOn, 1 },
+                                                    { ids::chorusRate, 0.4f }, { ids::chorusDepth, 3 }, { ids::delayOn, 1 },
+                                                    { ids::delayTime, 0.38f }, { ids::delayFeedback, 40 }, { ids::delayMix, 28 },
+                                                    { ids::delayPingPong, 1 }, { ids::reverbOn, 1 }, { ids::reverbMix, 30 },
+                                                    { ids::reverbSize, 80 }, { ids::reverbDecay, 4.0f }, { ids::reverbPredelay, 30 },
+                                                    { ids::volume, -1.5f } } },
+            { "Wurlitzer Overdrive", "wurli", { { ids::hardness, 40 }, { ids::fxOn, 1 }, { ids::panOn, 0 }, { ids::delayOn, 0 },
+                                                 { ids::fxDrive, 70 }, { ids::fxMid, 3 }, { ids::fxMidFreq, 900 },
+                                                 { ids::compAmount, 50 }, { ids::volume, -5 } } },
+            { "Wurlitzer Tremolo", "wurli", { { ids::fxOn, 1 }, { ids::panOn, 1 }, { ids::panWave, 3 }, { ids::panRate, 6.0f },
+                                               { ids::panDepth, 55 }, { ids::delayOn, 0 }, { ids::fxDrive, 20 },
+                                               { ids::reverbOn, 1 }, { ids::reverbMix, 12 }, { ids::reverbSize, 30 },
+                                               { ids::reverbDecay, 1.0f }, { ids::volume, -2 } } },
+            { "Pianet Echo", "pianet", { { ids::fxOn, 1 }, { ids::panOn, 0 }, { ids::fxDrive, 15 }, { ids::delayOn, 1 },
+                                          { ids::delayTime, 0.33f }, { ids::delayFeedback, 35 }, { ids::delayMix, 30 },
+                                          { ids::delayPingPong, 1 }, { ids::reverbOn, 1 }, { ids::reverbMix, 15 }, { ids::volume, -3 } } },
+            { "Clavinet Octave Bass", "clavinet", { { ids::transpose, -12 }, { ids::hardness, -40 }, { ids::fxOn, 1 }, { ids::panOn, 0 },
+                                                     { ids::delayOn, 0 }, { ids::fxDrive, 20 }, { ids::fxBass, 4 },
+                                                     { ids::fxTreble, -3 }, { ids::compAmount, 50 } } },
+            { "Clavinet Phaser", "clavinet", { { ids::fxOn, 1 }, { ids::panOn, 0 }, { ids::delayOn, 0 }, { ids::fxDrive, 20 },
+                                                { ids::phaserOn, 1 }, { ids::phaserRate, 0.4f }, { ids::phaserDepth, 70 },
+                                                { ids::volume, -1 } } },
+            { "Splendid Grand Intimate", "splendid_hybrid", { { ids::hardness, -100 }, { ids::velocityCurve, 30 }, { ids::humanize, 60 },
+                                                               { ids::reverbOn, 1 }, { ids::reverbMix, 14 }, { ids::reverbSize, 30 },
+                                                               { ids::reverbDecay, 1.0f }, { ids::reverbDamping, 60 },
+                                                               { ids::reverbPredelay, 10 } } },
+            { "Salamander Concert Hall", "salamander", { { ids::stretch, 2 }, { ids::reverbOn, 1 }, { ids::reverbMix, 34 },
+                                                          { ids::reverbSize, 88 }, { ids::reverbDecay, 3.6f },
+                                                          { ids::reverbDamping, 40 }, { ids::reverbPredelay, 35 },
+                                                          { ids::volume, -2 } } },
+            { "Salamander A=432", "salamander", { { ids::tune, -31.8f }, { ids::reverbOn, 1 }, { ids::reverbMix, 24 },
+                                                   { ids::reverbSize, 60 }, { ids::reverbDecay, 2.2f }, { ids::reverbPredelay, 20 } } },
+            { "Honky-Tonk Upright", "upright", { { ids::unison, 150 }, { ids::hardness, 80 }, { ids::tune, -12 },
+                                                  { ids::reverbOn, 1 }, { ids::reverbMix, 10 }, { ids::reverbSize, 25 },
+                                                  { ids::reverbDecay, 0.8f }, { ids::reverbPredelay, 5 } } },
+            { "Felt Upright", "upright", { { ids::hardness, -150 }, { ids::decay, -30 }, { ids::velocityCurve, 30 },
+                                            { ids::reverbOn, 1 }, { ids::reverbMix, 18 }, { ids::reverbSize, 40 },
+                                            { ids::reverbDecay, 1.4f }, { ids::reverbDamping, 65 }, { ids::reverbPredelay, 12 } } },
         };
         return presets;
     }
@@ -102,7 +155,7 @@ bool PresetManager::exists (const juce::String& name) const { return fileFor (na
 void PresetManager::resetToDefaults()
 {
     for (auto* p : state_.processor.getParameters())
-        if (auto* r = dynamic_cast<juce::RangedAudioParameter*> (p); r != nullptr && !isPlayerSetting (r->getParameterID()))
+        if (auto* r = dynamic_cast<juce::RangedAudioParameter*> (p))
             r->setValueNotifyingHost (r->getDefaultValue());
 }
 
@@ -137,7 +190,7 @@ bool PresetManager::loadUser (const juce::String& name)
     for (const auto& id : allParameterIds())
     {
         const auto child = tree.getChildWithProperty ("id", id);
-        if (child.isValid() && child.hasProperty ("value") && !isPlayerSetting (id))
+        if (child.isValid() && child.hasProperty ("value"))
             setParameter (state_, id, float (child.getProperty ("value")));
     }
     // a preset saved with MIDI assignments brings them along; one without keeps the current ones
@@ -162,9 +215,6 @@ bool PresetManager::save (const juce::String& name)
     if (clean.isEmpty() || !folder_.createDirectory())
         return false;
     auto tree = state_.copyState();
-    for (int i = tree.getNumChildren(); --i >= 0;)
-        if (isPlayerSetting (tree.getChild (i).getProperty ("id").toString()))
-            tree.removeChild (i, nullptr); // the keyboard's, not the sound's
     tree.setProperty (kNameProperty, clean, nullptr);
     tree.removeProperty (kFactoryProperty, nullptr);
     const auto xml = tree.createXml();

@@ -104,10 +104,6 @@ juce::String parameterHelp (const juce::String& id, engines::Family family);
 
 juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout();
 
-// a setting of the player's keyboard or band, not of a sound: presets neither store nor change it (the velocity curve,
-// transpose, tune)
-bool isPlayerSetting (const juce::String& id);
-
 // every parameter ID, in layout order (presets, tests)
 const juce::StringArray& allParameterIds();
 } // namespace tw
