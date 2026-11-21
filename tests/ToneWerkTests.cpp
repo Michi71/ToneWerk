@@ -988,3 +988,60 @@ TEST_CASE ("A key releases the note it struck when the transposition changes mea
     const double released = run (off, 280); // 3 s: the damper has it
     CHECK (released < 0.01 * sounding);
 }
+
+TEST_CASE ("The plugin reports one latency and every voice has it", "[audio][latency]")
+{
+    for (const double rate : { 44100.0, 48000.0, 96000.0 })
+    {
+        const int latency = tw::InstrumentVoice::latencyFor (rate);
+        CHECK (latency >= tw::Resampler::kHalfTaps);
+        CHECK (1000.0 * latency / rate < 0.65); // about 0.58 ms at every rate
+
+        PluginProcessor plugin;
+        plugin.setRateAndBufferSizeDetails (rate, 512);
+        plugin.prepareToPlay (rate, 512);
+        CHECK (plugin.getLatencySamples() == latency);
+
+        // own delay + padding = the reported latency, for every instrument and the tuning extremes
+        for (int i = 0; i < instrumentCount(); ++i)
+            for (const float cents : { -100.0f, 0.0f, 100.0f })
+            {
+                tw::VoiceConfig config;
+                config.instrument = i;
+                config.tuneCents = cents;
+                tw::InstrumentVoice voice (config);
+                voice.prepare (rate, 512, latency);
+                INFO (tw::instrumentId (i) << " at " << rate << " Hz, " << cents << " ct: own " << voice.ownLatency() << ", padding "
+                                           << voice.padding());
+                CHECK (voice.ownLatency() <= double (latency));
+                CHECK (std::abs (voice.ownLatency() + voice.padding() - latency) <= 0.5);
+            }
+    }
+
+    // the padding is a plain delay: a hybrid voice (it repeats a strike bit for bit) with and without it
+    tw::VoiceConfig config;
+    config.instrument = instrumentCount() - 1;
+    tw::InstrumentVoice plain (config), padded (config);
+    plain.prepare (48000.0, 512);
+    padded.prepare (48000.0, 512, 28);
+    REQUIRE (padded.padding() == 28);
+    std::vector<float> a (512), b (512), r (512), before;
+    plain.noteOn (60, 100);
+    padded.noteOn (60, 100);
+    double difference = 0.0, level = 0.0;
+    for (int block = 0; block < 20; ++block)
+    {
+        plain.render (a.data(), r.data(), 512);
+        padded.render (b.data(), r.data(), 512);
+        before.insert (before.end(), a.begin(), a.end());
+        for (size_t k = 0; k < 512; ++k)
+        {
+            const size_t at = size_t (block) * 512 + k;
+            const float expected = at >= 28 ? before[at - 28] : 0.0f;
+            difference = std::max (difference, double (std::abs (b[k] - expected)));
+            level = std::max (level, double (std::abs (expected)));
+        }
+    }
+    CHECK (level > 1e-3);
+    CHECK (difference < 1e-6);
+}

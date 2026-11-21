@@ -106,7 +106,8 @@ int64_t PluginProcessor::wantedSignature() const { return signatureOf (wantedCon
 void PluginProcessor::build (const tw::VoiceConfig& config)
 {
     auto voice = std::make_unique<tw::InstrumentVoice> (config);
-    voice->prepare (hostRate_.load(), kChunk);
+    const double rate = hostRate_.load();
+    voice->prepare (rate, kChunk, tw::InstrumentVoice::latencyFor (rate));
     {
         const juce::ScopedLock sl (statusLock_);
         status_ = voice->status();
@@ -163,6 +164,8 @@ juce::String PluginProcessor::instrumentStatus() const
 void PluginProcessor::prepareToPlay (double sampleRate, int)
 {
     hostRate_.store (sampleRate);
+    // the same for every instrument and tuning (InstrumentVoice::latencyFor): the host need not be told again on a switch
+    setLatencySamples (tw::InstrumentVoice::latencyFor (sampleRate));
     fx_.setDelayTime (4.0);
     fx_.init (sampleRate);
     fxGain_ = 0.0f;
@@ -179,7 +182,7 @@ void PluginProcessor::prepareToPlay (double sampleRate, int)
     ringQuietFrames_ = int64_t (kRingQuietS * sampleRate);
     ringMaxFrames_ = int64_t (kRingMaxS * sampleRate);
     if (active_ && !juce::exactlyEqual (active_->hostRate(), sampleRate))
-        active_->prepare (sampleRate, kChunk);
+        active_->prepare (sampleRate, kChunk, tw::InstrumentVoice::latencyFor (sampleRate));
     if (auto* p = pending_.load(); p != nullptr && !juce::exactlyEqual (p->hostRate(), sampleRate))
         rebuild_.store (true); // adoptPending() refuses it, the loader builds one for this rate
 }

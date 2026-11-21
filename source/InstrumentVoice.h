@@ -55,7 +55,19 @@ public:
     explicit InstrumentVoice (const VoiceConfig& config);
 
     // host rate and the largest render() call; prepares the engine and the resampler, allocates. Not real-time safe.
-    void prepare (double hostRate, int maxFrames);
+    // latencyFrames: the delay from a note-on to its sound every voice shall have (latencyFor); a voice with less of its own
+    // (no resampler, or a shorter lookahead) delays its output by the rest. 0: only the voice's own.
+    void prepare (double hostRate, int maxFrames, int latencyFrames = 0);
+
+    // The longest delay a voice has at a host rate [host frames]: the resampler's lookahead at the lowest ratio, i.e. a
+    // physical model (calibration rate) tuned all the way down. The plugin reports it to the host and pads every voice to it,
+    // so the latency does not change with the instrument or the tuning.
+    static constexpr double kCalibrationRate = 44100.0;
+    static constexpr double kMaxTuneCents = 100.0;
+    static int latencyFor (double hostRate);
+    // this voice's own delay [host frames] and the padding on top of it
+    double ownLatency() const { return resample_ ? double (resampler_.lookahead()) / resampler_.ratio() : 0.0; }
+    int padding() const { return int (pad_.size()); }
     double hostRate() const { return hostRate_; }
     int maxFrames() const { return maxFrames_; }
 
@@ -101,6 +113,9 @@ private:
 
     Resampler resampler_;
     bool resample_ = false;
+    std::vector<float> pad_; // delay line that fills the voice's latency up to the reported one
+    size_t padAt_ = 0;
+    void delay (float* x, int n);
     std::atomic<bool> failed_ { false };
 
     bool finite (const float* x, int n) const;

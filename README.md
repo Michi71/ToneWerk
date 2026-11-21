@@ -123,6 +123,10 @@ compiled into it. The engines render mono; the effect chain and the reverb make 
   input samples (0.54 ms); passband flat to ±0.03 dB up to 18 kHz, 83–97 dB signal-to-noise (`tests/ResamplerTests.cpp`). The
   hybrid voices run at the host rate and resample their banks themselves. `./Builds/Tests "[.latency]"` measures the time from note-on to the attack for
   every instrument.
+- **Latency:** the plugin reports one latency to the host, the same for every instrument and tuning: the resampler's
+  lookahead at its lowest ratio (a physical model tuned 100 cents down), 26 frames at 44.1 kHz, 28 at 48 kHz, about
+  0.58 ms. A voice with less delay of its own (a hybrid voice, a physical model at 44.1 kHz) delays its output by the
+  rest, so the host's compensation is right for all of them and need not change when the instrument does.
 - The screenshot above is rendered by a hidden test: `TONEWERK_SNAPSHOT=$PWD/docs/images/tonewerk.png ./Builds/Tests "[.snapshot]"`.
 - The three engines all call themselves `pmp::Engine`; each is built as its own library with the namespace renamed and reached
   through one interface (`engine/adapters/sound_engine.h`, [engine/UPSTREAM.md](engine/UPSTREAM.md)).
