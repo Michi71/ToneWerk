@@ -5,7 +5,7 @@ non-public code bases; ToneWerk changes none of their sources and only builds th
 
 | Folder | Contents | Version | Instruments |
 |---|---|---|---|
-| `tines/src/core` | the Rhodes engine (without its C API) | `6dc2cf5a8725e4554beff137064699fa7e449eb5` (2026-11-22: the hard attack of single keys is evened out: Mark V B♭4–G5 and E3, Mark I G4–A4, Sparkle Top E3, Mark 8 E6–G♯6 and C♯5, F5, A♯6, C♯7) | Rhodes Mark I, Mark II, Mark V, Mark 7, Mark 8, Sparkle Top: physical models |
+| `tines/src/core` | the Rhodes engine (without its C API) | `894910eebc8c81b438f2a8a820a5a45cfb596870` (2026-11-22: the Mark 7's attack hardens with the velocity from C3 to D♯6, as in its recordings; before that the hard attack of single keys was evened out in Mark V, Mark I, Sparkle Top and Mark 8) | Rhodes Mark I, Mark II, Mark V, Mark 7, Mark 8, Sparkle Top: physical models |
 | `reeds/src/core` | the reed engine (without its C API) | `d5b9e804a0f10a453feda2daa06a1269a157bd7c` (2026-11-07: the preset comments stay out of the binary) | Wurlitzer 200A, Hohner Pianet T: physical models |
 | `hybrid/src/core` | the hybrid engine (without its C API and the generated `hybrid_*_bank.cpp`) | `e71b215952897dfcc6649dcad1c2fe5579103367` (2026-11-21: a key counts as sounding from its strike, not only once its modes have taken over from the sampled attack; the banks are those of 2026-11-09) | Hohner Clavinet D6, Splendid Grand, Salamander Grand, Upright Piano KW: hybrid voices |
 | `hybrid/banks` | the bank images of the hybrid engine | the images of that state (CRC-32 in the `hybrid_*_bank.h` headers: 9c61df53, 2ef67e42, 350743e5, 0ec9521e) | the banks of the hybrid voices |
