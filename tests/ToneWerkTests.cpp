@@ -33,6 +33,19 @@ bool waitForInstrument (PluginProcessor& p, int blockSize, double seconds = 30.0
     return false;
 }
 
+// waits for the voice of the current parameters and then for the one before it: after a voicing change that one rings out
+// next to the new voice, which a measurement must not include (release the keys first)
+bool waitForInstrumentAlone (PluginProcessor& p, int blockSize)
+{
+    if (!waitForInstrument (p, blockSize))
+        return false;
+    juce::AudioBuffer<float> buffer (2, blockSize);
+    juce::MidiBuffer midi;
+    for (int b = 0; b < int (90.0 * 48000.0 / blockSize) && p.ringingOut(); ++b)
+        p.processBlock (buffer, midi);
+    return !p.ringingOut();
+}
+
 // plays one note for `seconds` and returns the RMS of the left and right channel
 std::pair<double, double> playNote (PluginProcessor& p, double rate, int blockSize, int note, double seconds)
 {
@@ -433,7 +446,7 @@ TEST_CASE ("Voicing extremes per instrument", "[.voicing]")
                 continue; // not a control of this instrument
             for (const auto& s : set)
                 setParam (plugin, s.id, s.value);
-            REQUIRE (waitForInstrument (plugin, 512));
+            REQUIRE (waitForInstrumentAlone (plugin, 512));
             juce::AudioBuffer<float> buffer (2, 512);
             double sum = 0.0, diff = 0.0, peak = 0.0;
             float last = 0.0f;
@@ -454,6 +467,9 @@ TEST_CASE ("Voicing extremes per instrument", "[.voicing]")
                     last = x;
                 }
             }
+            juce::MidiBuffer off;
+            off.addEvent (juce::MidiMessage::allNotesOff (1), 0);
+            plugin.processBlock (buffer, off);
             const double rms = std::sqrt (sum / 48000.0), bright = std::sqrt (diff / std::max (sum, 1e-30));
             if (set.empty())
                 rms0 = rms, bright0 = bright;
@@ -463,6 +479,65 @@ TEST_CASE ("Voicing extremes per instrument", "[.voicing]")
                   << ", brightness " << juce::String (20.0 * std::log10 (bright / bright0), 1) << " dB"
                   << (std::isfinite (rms) ? "" : "  NOT FINITE"));
         }
+    }
+}
+
+TEST_CASE ("A voicing change lets the sounding notes ring out", "[audio][voicing]")
+{
+    auto rmsOf = [] (PluginProcessor& p, juce::MidiBuffer midi, double seconds) {
+        juce::AudioBuffer<float> buffer (2, 512);
+        double sum = 0.0;
+        const int blocks = int (seconds * 48000.0 / 512);
+        for (int b = 0; b < blocks; ++b)
+        {
+            buffer.clear();
+            p.processBlock (buffer, midi);
+            midi.clear();
+            for (int k = 0; k < 512; ++k)
+                sum += double (buffer.getSample (0, k)) * buffer.getSample (0, k);
+        }
+        return std::sqrt (sum / (blocks * 512.0));
+    };
+    for (int i = 0; i < instrumentCount(); ++i)
+    {
+        PluginProcessor plugin;
+        plugin.setRateAndBufferSizeDetails (48000.0, 512);
+        plugin.prepareToPlay (48000.0, 512);
+        setParam (plugin, tw::ids::instrument, float (i));
+        REQUIRE (waitForInstrument (plugin, 512));
+
+        juce::MidiBuffer on;
+        on.addEvent (juce::MidiMessage::noteOn (1, 48, (juce::uint8) 100), 0);
+        const double before = rmsOf (plugin, on, 0.1);
+        REQUIRE (before > 1e-4);
+        CHECK_FALSE (plugin.ringingOut());
+
+        // the key stays down while the voicing changes: the note keeps sounding in the old voice
+        setParam (plugin, tw::ids::hardness, 50.0f);
+        REQUIRE (waitForInstrument (plugin, 512));
+        CHECK (plugin.ringingOut());
+        const double held = rmsOf (plugin, {}, 0.1);
+        WARN (tw::instrumentId (i).paddedRight (' ', 10) << " held note after the change: "
+                                                         << juce::String (20.0 * std::log10 (held / before), 1) << " dB");
+        CHECK (held > 1e-4);
+
+        // a new strike plays in the new voice, next to the ringing one
+        juce::MidiBuffer second;
+        second.addEvent (juce::MidiMessage::noteOn (1, 60, (juce::uint8) 100), 0);
+        CHECK (rmsOf (plugin, second, 0.1) > held);
+
+        // the release of the old key reaches the old voice: it damps, and the voice is handed back
+        juce::MidiBuffer off;
+        off.addEvent (juce::MidiMessage::noteOff (1, 48), 0);
+        off.addEvent (juce::MidiMessage::noteOff (1, 60), 0);
+        rmsOf (plugin, off, 0.1);
+        bool rungOut = false;
+        for (int t = 0; t < 200 && !rungOut; ++t)
+        {
+            rmsOf (plugin, {}, 0.1);
+            rungOut = !plugin.ringingOut();
+        }
+        CHECK (rungOut);
     }
 }
 
@@ -672,7 +747,7 @@ TEST_CASE ("CPU load per instrument", "[.cpu]")
         for (const auto& play : { Play { "8 keys", 8 }, Play { "24 keys", 24 }, Play { "all keys", 0 }, Play { "all keys, 16 voices", -16 } })
         {
             setParam (plugin, tw::ids::polyphony, float (play.keys < 0 ? tw::polyphonyChoices().indexOf ("16") : 0));
-            REQUIRE (waitForInstrument (plugin, block));
+            REQUIRE (waitForInstrumentAlone (plugin, block));
             // silence first
             for (int b = 0; b < 40; ++b)
             {

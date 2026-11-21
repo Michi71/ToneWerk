@@ -70,7 +70,9 @@ compiled into it. The engines render mono; the effect chain and the reverb make 
 - **Voicing**: the controls of the instrument's engine on top of its calibration. The physical models take the technician's
   controls (hardness, hammer mass, strike point, tine or reed gauge, pickup gap and offset, the Rhodes' tonebar, damper), the
   hybrid voices hardness, decay, unison and stretch on their poles ([docs/INSTRUMENTS.md](docs/INSTRUMENTS.md)). Every change
-  rebuilds the instrument (after 250 ms without further changes); sounding notes stop. A harder or heavier hammer or a thinner
+  rebuilds the instrument (after 250 ms without further changes). Sounding notes ring out with the voicing they were struck
+  with, pedal and key releases included, while every new strike plays the new voicing; for that time two instruments compute.
+  A further change while notes still ring out fades them in 30 ms (two instruments at most). A harder or heavier hammer or a thinner
   tine or reed integrates the hammer contact with 32 sub-steps instead of 2, and hammer mass (+100 %) and gauge (−30 %) stop
   short of where combined extremes ran away. The settings stay when the instrument
   changes, and extremes carry over: **Reset** sets every control back to the instrument as calibrated.

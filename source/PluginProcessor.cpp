@@ -162,6 +162,10 @@ void PluginProcessor::prepareToPlay (double sampleRate, int)
     gain_.setCurrentAndTargetValue (juce::Decibels::decibelsToGain (volume_->load(), -48.0f));
     fadeStep_ = float (1.0 / (kFadeMs * 1e-3 * sampleRate));
     fading_.reset(); // not real time here
+    setRinging (false);
+    ringKeys_.reset();
+    ringQuietFrames_ = int64_t (kRingQuietS * sampleRate);
+    ringMaxFrames_ = int64_t (kRingMaxS * sampleRate);
     if (active_ && !juce::exactlyEqual (active_->hostRate(), sampleRate))
         active_->prepare (sampleRate, kChunk);
     if (auto* p = pending_.load(); p != nullptr && !juce::exactlyEqual (p->hostRate(), sampleRate))
@@ -183,10 +187,23 @@ void PluginProcessor::retire (std::unique_ptr<tw::InstrumentVoice>& voice)
         voice.release();
 }
 
+void PluginProcessor::setRinging (bool ringing)
+{
+    ringing_ = ringing;
+    ringingFlag_.store (ringing, std::memory_order_relaxed);
+}
+
 void PluginProcessor::adoptPending()
 {
-    if (fading_ != nullptr || pending_.load() == nullptr)
-        return; // one switch at a time: the previous fade is still running or not collected yet
+    if (pending_.load() == nullptr)
+        return;
+    if (fading_ != nullptr)
+    {
+        // one switch at a time: the previous fade is still running or not collected yet. A voice that rings out makes way
+        // for the next one (two voices at most): it fades now and the pending one is adopted when it is gone.
+        setRinging (false);
+        return;
+    }
     std::unique_ptr<tw::InstrumentVoice> next (pending_.exchange (nullptr));
     if (next == nullptr)
         return;
@@ -199,8 +216,13 @@ void PluginProcessor::adoptPending()
         return;
     }
     next->controller (64, sustain_);
+    // the same instrument with another voicing (or voice limit): what sounds keeps sounding. Another instrument fades out.
+    const bool ring = active_ != nullptr && active_->config().instrument == next->config().instrument && active_->activeKeys() > 0;
     fading_ = std::move (active_);
     fadeGain_ = 1.0f;
+    setRinging (ring);
+    ringKeys_ = ring ? held_ : std::bitset<128>();
+    ringFrames_ = ringQuiet_ = 0;
     active_ = std::move (next);
     readyGeneration_.store (signatureOf (active_->config()));
 }
@@ -219,16 +241,45 @@ void PluginProcessor::handleMidi (const juce::MidiMessage& m)
         pendingProgram_.store (m.getProgramChangeNumber());
         return;
     }
-    if (active_ == nullptr)
-        return;
+    // the ringing voice gets no new strikes: only the releases of its own keys, the pedal and the other controllers
+    auto* ringing = ringing_ ? fading_.get() : nullptr;
+    const auto key = size_t (m.getNoteNumber() & 127);
+    auto releaseRinging = [&] {
+        if (ringing == nullptr || !ringKeys_.test (key))
+            return false;
+        ringKeys_.reset (key);
+        ringing->noteOff (int (key));
+        return true;
+    };
     if (m.isNoteOn())
-        active_->noteOn (m.getNoteNumber(), humanize_.apply (m.getVelocity(), double (humanizeAmount_->load()) * 0.01));
+    {
+        held_.set (key);
+        releaseRinging(); // a second note-on without a note-off in between
+        if (active_ != nullptr)
+            active_->noteOn (int (key), humanize_.apply (m.getVelocity(), double (humanizeAmount_->load()) * 0.01));
+    }
     else if (m.isNoteOff())
-        active_->noteOff (m.getNoteNumber());
+    {
+        held_.reset (key);
+        if (!releaseRinging() && active_ != nullptr)
+            active_->noteOff (int (key));
+    }
     else if (m.isAllNotesOff())
-        active_->allNotesOff();
+    {
+        held_.reset();
+        ringKeys_.reset();
+        if (ringing != nullptr)
+            ringing->allNotesOff();
+        if (active_ != nullptr)
+            active_->allNotesOff();
+    }
     else if (m.isController())
-        active_->controller (m.getControllerNumber(), m.getControllerValue());
+    {
+        if (ringing != nullptr)
+            ringing->controller (m.getControllerNumber(), m.getControllerValue());
+        if (active_ != nullptr)
+            active_->controller (m.getControllerNumber(), m.getControllerValue());
+    }
 }
 
 void PluginProcessor::renderSegment (float* left, float* right, int n)
@@ -245,6 +296,22 @@ void PluginProcessor::renderSegment (float* left, float* right, int n)
     float* fl = scratch_.getWritePointer (0);
     float* fr = scratch_.getWritePointer (1);
     fading_->render (fl, fr, n);
+    if (ringing_)
+    {
+        float peak = 0.0f;
+        for (int i = 0; i < n; ++i)
+        {
+            left[i] += fl[i];
+            right[i] += fr[i];
+            peak = juce::jmax (peak, std::abs (fl[i]), std::abs (fr[i]));
+        }
+        ringFrames_ += n;
+        ringQuiet_ = peak < kRingFloor ? ringQuiet_ + n : 0;
+        // rung out: no key sounds any more, or what is left is inaudible. The short fade below ends it without a step.
+        if (fading_->activeKeys() == 0 || ringQuiet_ >= ringQuietFrames_ || ringFrames_ >= ringMaxFrames_)
+            setRinging (false);
+        return;
+    }
     for (int i = 0; i < n; ++i)
     {
         left[i] += fadeGain_ * fl[i];
