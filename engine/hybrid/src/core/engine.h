@@ -49,7 +49,7 @@ public:
     // --- info -------------------------------------------------------------------------------
     double sampleRate() const { return fs_; }
     double internalRate() const { return fs_; }   // the bank runs at its own rate, resampled to fs_
-    int    activeKeys() const;                   // sounding keys of the hybrid player
+    int    activeKeys() const;                   // sounding keys of the hybrid player, from the strike on
     int    maxVoices() const;                    // polyphony limit (num.maxVoices)
     bool   sustain() const { return sustain_; }
     bool   hybridActive() const { return hybridActive_; }   // the selected bank is prepared at this rate

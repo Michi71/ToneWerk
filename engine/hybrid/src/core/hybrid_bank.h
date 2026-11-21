@@ -206,6 +206,7 @@ public:
 
     int attackVoices() const;                      // attacks in progress (the first 100 ms of a strike)
     int sustainingKeys() const;                    // keys with a sounding mode state or loop
+    int soundingKeys() const;                      // ... or an attack: every key that makes sound, from its strike on
     int loops() const;                             // high-band loops sounding (active and fading out)
     long stolen() const { return stolen_; }        // attacks faded out for lack of a slot
     long dropped() const { return dropped_; }      // attacks lost for lack of a fade slot
