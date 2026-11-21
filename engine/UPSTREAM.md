@@ -5,7 +5,7 @@ non-public code bases; ToneWerk changes none of their sources and only builds th
 
 | Folder | Contents | Version | Instruments |
 |---|---|---|---|
-| `tines/src/core` | the Rhodes engine (without its C API) | `4a88a60e03523698515fff3186c7bde2850a8cb9` (2026-11-09: the upper tonebar is muted where it clicks, in Mark I, Mark V and Mark 7) | Rhodes Mark I, Mark II, Mark V, Mark 7, Mark 8, Sparkle Top: physical models |
+| `tines/src/core` | the Rhodes engine (without its C API) | `e7ab32d5513dba645e967ab819608103af1cc271` (2026-11-21: the Mark V's hard attack at B4–G5 and E3 is evened out: the upper tonebar is capped there, the pickup at E3 reads where F3's does) | Rhodes Mark I, Mark II, Mark V, Mark 7, Mark 8, Sparkle Top: physical models |
 | `reeds/src/core` | the reed engine (without its C API) | `d5b9e804a0f10a453feda2daa06a1269a157bd7c` (2026-11-07: the preset comments stay out of the binary) | Wurlitzer 200A, Hohner Pianet T: physical models |
 | `hybrid/src/core` | the hybrid engine (without its C API and the generated `hybrid_*_bank.cpp`) | `e71b215952897dfcc6649dcad1c2fe5579103367` (2026-11-21: a key counts as sounding from its strike, not only once its modes have taken over from the sampled attack; the banks are those of 2026-11-09) | Hohner Clavinet D6, Splendid Grand, Salamander Grand, Upright Piano KW: hybrid voices |
 | `hybrid/banks` | the bank images of the hybrid engine | the images of that state (CRC-32 in the `hybrid_*_bank.h` headers: 9c61df53, 2ef67e42, 350743e5, 0ec9521e) | the banks of the hybrid voices |
