@@ -522,15 +522,14 @@ TEST_CASE ("A voicing change lets the sounding notes ring out", "[audio][voicing
                                                          << juce::String (20.0 * std::log10 (held / before), 1) << " dB");
         CHECK (held > 1e-4);
 
-        // a new strike plays in the new voice, next to the ringing one
+        // a new strike while the old voice rings; its key stays down
         juce::MidiBuffer second;
         second.addEvent (juce::MidiMessage::noteOn (1, 60, (juce::uint8) 100), 0);
-        CHECK (rmsOf (plugin, second, 0.1) > held);
+        rmsOf (plugin, second, 0.1);
 
         // the release of the old key reaches the old voice: it damps, and the voice is handed back
         juce::MidiBuffer off;
         off.addEvent (juce::MidiMessage::noteOff (1, 48), 0);
-        off.addEvent (juce::MidiMessage::noteOff (1, 60), 0);
         rmsOf (plugin, off, 0.1);
         bool rungOut = false;
         for (int t = 0; t < 200 && !rungOut; ++t)
@@ -539,6 +538,13 @@ TEST_CASE ("A voicing change lets the sounding notes ring out", "[audio][voicing
             rungOut = !plugin.ringingOut();
         }
         CHECK (rungOut);
+
+        // what sounds now is the new strike: it went to the new voice, not to the one that is gone
+        rmsOf (plugin, {}, 0.1); // the old voice's last fade
+        CHECK (rmsOf (plugin, {}, 0.1) > 1e-4);
+        juce::MidiBuffer last;
+        last.addEvent (juce::MidiMessage::noteOff (1, 60), 0);
+        rmsOf (plugin, last, 0.1);
     }
 }
 
