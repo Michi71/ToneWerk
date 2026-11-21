@@ -181,8 +181,6 @@ void PluginProcessor::prepareToPlay (double sampleRate, int)
     ringKeys_.reset();
     ringQuietFrames_ = int64_t (kRingQuietS * sampleRate);
     ringMaxFrames_ = int64_t (kRingMaxS * sampleRate);
-    ringAttackFrames_ = int64_t (kRingAttackS * sampleRate);
-    sinceStrike_ = ringSinceStrike_ = kLongAgo;
     if (active_ && !juce::exactlyEqual (active_->hostRate(), sampleRate))
         active_->prepare (sampleRate, kChunk, tw::InstrumentVoice::latencyFor (sampleRate));
     if (auto* p = pending_.load(); p != nullptr && !juce::exactlyEqual (p->hostRate(), sampleRate))
@@ -234,16 +232,12 @@ void PluginProcessor::adoptPending()
     }
     next->controller (64, sustain_);
     // the same instrument with another voicing (or voice limit): what sounds keeps sounding. Another instrument fades out.
-    // (a strike a moment ago sounds whatever the engine's count says: kRingAttackS)
-    const bool ring = active_ != nullptr && active_->config().instrument == next->config().instrument
-                      && (active_->activeKeys() > 0 || sinceStrike_ < ringAttackFrames_);
+    const bool ring = active_ != nullptr && active_->config().instrument == next->config().instrument && active_->activeKeys() > 0;
     fading_ = std::move (active_);
     fadeGain_ = 1.0f;
     setRinging (ring);
     ringKeys_ = ring ? held_ : std::bitset<128>();
     ringFrames_ = ringQuiet_ = 0;
-    ringSinceStrike_ = sinceStrike_;
-    sinceStrike_ = kLongAgo;
     active_ = std::move (next);
     readyGeneration_.store (signatureOf (active_->config()));
 }
@@ -294,7 +288,6 @@ void PluginProcessor::handleMidi (const juce::MidiMessage& m)
         releaseRinging(); // a second note-on without a note-off in between
         if (active_ != nullptr)
         {
-            sinceStrike_ = 0;
             const int velocity = tw::velocityCurve (m.getVelocity(), double (velocityCurve_->load()) * 0.01);
             active_->noteOn (int (key), humanize_.apply (velocity, double (humanizeAmount_->load()) * 0.01));
         }
@@ -326,7 +319,6 @@ void PluginProcessor::handleMidi (const juce::MidiMessage& m)
 
 void PluginProcessor::renderSegment (float* left, float* right, int n)
 {
-    sinceStrike_ = juce::jmin (kLongAgo, sinceStrike_ + n);
     if (active_ != nullptr)
         active_->render (left, right, n);
     else
@@ -349,11 +341,9 @@ void PluginProcessor::renderSegment (float* left, float* right, int n)
             peak = juce::jmax (peak, std::abs (fl[i]), std::abs (fr[i]));
         }
         ringFrames_ += n;
-        ringSinceStrike_ = juce::jmin (kLongAgo, ringSinceStrike_ + n);
         ringQuiet_ = peak < kRingFloor ? ringQuiet_ + n : 0;
         // rung out: no key sounds any more, or what is left is inaudible. The short fade below ends it without a step.
-        const bool noKey = fading_->activeKeys() == 0 && ringSinceStrike_ >= ringAttackFrames_;
-        if (noKey || ringQuiet_ >= ringQuietFrames_ || ringFrames_ >= ringMaxFrames_)
+        if (fading_->activeKeys() == 0 || ringQuiet_ >= ringQuietFrames_ || ringFrames_ >= ringMaxFrames_)
             setRinging (false);
         return;
     }

@@ -587,6 +587,12 @@ int HybridPlayer::sustainingKeys() const {
     return n;
 }
 
+int HybridPlayer::soundingKeys() const {
+    int n = 0;
+    for (int i = 0; i < d_->nKeys; ++i) n += d_->sounding(i);
+    return n;
+}
+
 int HybridPlayer::loops() const {
     int n = 0;
     for (const auto& k : d_->keys) n += int(k.act.used) + int(k.old.used);

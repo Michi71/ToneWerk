@@ -94,7 +94,8 @@ int Engine::maxVoices() const {
 }
 
 int Engine::activeKeys() const {
-    return hybridActive_ && hybrid_ ? hybrid_->sustainingKeys() : 0;
+    // from the strike on: a key in its sampled attack has no mode state yet (the first 0.25 s) and sounds all the same
+    return hybridActive_ && hybrid_ ? hybrid_->soundingKeys() : 0;
 }
 
 void Engine::noteOn(int note, int velocity) {

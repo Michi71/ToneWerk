@@ -1198,8 +1198,8 @@ TEST_CASE ("Factory preset levels", "[.presetlevels]")
     }
 }
 
-// The hybrid engine counts a key as sounding only once its computed modes have taken over from the sampled attack (0.25 s
-// after the strike): a voicing change right after a strike must let that note ring out all the same
+// A hybrid voice plays a sampled attack before its computed modes take over (0.25 s after the strike): a voicing change
+// in that time must let the note ring out all the same (the engine counts a key as sounding from its strike)
 TEST_CASE ("A note struck just before a voicing change rings out", "[audio][voicing]")
 {
     for (const int i : { 0, tw::instrumentIndex ("clavinet"), instrumentCount() - 1 })
