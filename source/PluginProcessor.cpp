@@ -414,10 +414,11 @@ void PluginProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::Midi
     for (; it != midi.end(); ++it)
         handleMidi ((*it).getMessage());
 
-    // the MK8 effect chain (stereo only), then the reverb on its own switch (the grands want it without the MK8 preamp), both at
+    // the MK8 effect chain, then the reverb on its own switch (the grands want it without the MK8 preamp), both at
     // the host rate. A switch cross-fades the stage in or out over kSwitchMs: the hard switch clicked (measured: the largest
     // step 4.7 times the chord's own when the chain came in)
-    const bool fxOn = fxp_.on->load() > 0.5f && !mono;
+    // (a mono output: both run in stereo on a scratch channel and are folded down below)
+    const bool fxOn = fxp_.on->load() > 0.5f;
     const bool reverbOn = rvp_.on->load() > 0.5f;
     if (fxOn || fxGain_ > 0.0f)
         updateEffects();

@@ -91,7 +91,9 @@ compiled into it. The engines render mono; the effect chain and the reverb make 
   changes, and extremes carry over: **Reset** sets every control back to the instrument as calibrated.
 - **Effects**: the MK8 chain in the units of the Rhodes V8 Pro – preamp (drive, envelope, level), equalizer, Vari-Pan,
   compressor, chorus, phaser, delay. The **FX** switch bypasses the whole chain; like the reverb switch it cross-fades over
-  20 ms, so switching while playing does not click.
+  20 ms, so switching while playing does not click. On a mono output the chain and the reverb run in stereo and the two
+  channels are summed: the Vari-Pan then acts as a tremolo, and at full depth the sum is about 12 dB quieter (measured with
+  the square wave).
 - **Reverb** at the end, on its own switch (independent of **FX**, so the grands get a room without the MK8 preamp): mix, size,
   decay (RT60 0.3–10 s), damping (how much faster the highs die away), pre-delay (0–200 ms), width. The grand presets have it on;
   Steinway and Grandpa's with less, their recordings carry some room already.

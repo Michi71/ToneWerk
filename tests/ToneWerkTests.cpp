@@ -1045,3 +1045,70 @@ TEST_CASE ("The plugin reports one latency and every voice has it", "[audio][lat
     CHECK (level > 1e-3);
     CHECK (difference < 1e-6);
 }
+
+TEST_CASE ("The effect chain works on a mono output", "[audio][fx][mono]")
+{
+    PluginProcessor plugin;
+    juce::AudioProcessor::BusesLayout layout;
+    layout.outputBuses.add (juce::AudioChannelSet::mono());
+    REQUIRE (plugin.setBusesLayout (layout));
+    plugin.setRateAndBufferSizeDetails (48000.0, 512);
+    plugin.prepareToPlay (48000.0, 512);
+    setParam (plugin, tw::ids::humanize, 0.0f);
+    REQUIRE (waitForInstrument (plugin, 512));
+
+    // one held note: the RMS of 1.2 s and how much the level of 20 ms windows moves (standard deviation / mean)
+    auto play = [&] {
+        juce::AudioBuffer<float> buffer (1, 512);
+        std::vector<double> windows;
+        double sum = 0.0, window = 0.0;
+        int inWindow = 0;
+        for (int b = 0; b < 300; ++b)
+        {
+            juce::MidiBuffer midi;
+            if (b == 0)
+                midi.addEvent (juce::MidiMessage::noteOn (1, 55, (juce::uint8) 100), 0);
+            if (b == 112)
+                midi.addEvent (juce::MidiMessage::noteOff (1, 55), 0);
+            buffer.clear();
+            plugin.processBlock (buffer, midi);
+            if (b >= 20 && b < 112)
+                for (int k = 0; k < 512; ++k)
+                {
+                    const double x = buffer.getSample (0, k);
+                    REQUIRE (std::isfinite (x));
+                    sum += x * x;
+                    window += x * x;
+                    if (++inWindow == 960)
+                    {
+                        windows.push_back (std::sqrt (window / 960.0));
+                        window = 0.0;
+                        inWindow = 0;
+                    }
+                }
+        }
+        double mean = 0.0, var = 0.0;
+        for (const double w : windows)
+            mean += w / double (windows.size());
+        for (const double w : windows)
+            var += (w - mean) * (w - mean) / double (windows.size());
+        return std::pair { std::sqrt (sum / (92 * 512.0)), std::sqrt (var) / mean };
+    };
+    const auto dry = play();
+    setParam (plugin, tw::ids::fxOn, 1.0f);
+    setParam (plugin, tw::ids::fxDrive, 100.0f);
+    setParam (plugin, tw::ids::panOn, 0.0f);
+    const auto wet = play();
+    CHECK (std::abs (wet.first - dry.first) > 1e-4);
+    CHECK (wet.first < 1.0);
+
+    // the Vari-Pan moves the sound between two channels: what is left of it in their sum
+    setParam (plugin, tw::ids::panOn, 1.0f);
+    setParam (plugin, tw::ids::panDepth, 100.0f);
+    setParam (plugin, tw::ids::panRate, 5.0f);
+    const auto panned = play();
+    WARN ("mono: level movement dry " << juce::String (dry.second, 3) << ", effects " << juce::String (wet.second, 3)
+                                       << ", with the Vari-Pan " << juce::String (panned.second, 3) << "; level with / without the pan "
+                                       << juce::String (20.0 * std::log10 (panned.first / wet.first), 1) << " dB");
+    CHECK (panned.first < 1.0);
+}
