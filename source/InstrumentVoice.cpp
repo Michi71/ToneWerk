@@ -31,7 +31,9 @@ void InstrumentVoice::prepare (double hostRate, int maxFrames)
         return;
     engineRate_ = engine_->rateFor (hostRate_);
     engine_->prepare (engineRate_);
-    const double ratio = engineRate_ / hostRate_;
+    // the tuning rides on the rate conversion: reading the engine's output faster raises every pitch (and shortens the
+    // decay by the same 6 % at most); a hybrid voice, at the host rate otherwise, gets the resampler for it
+    const double ratio = engineRate_ / hostRate_ * std::exp2 (double (config_.tuneCents) / 1200.0);
     resample_ = std::abs (ratio - 1.0) > 1e-9;
     if (resample_)
         resampler_.prepare (ratio, maxFrames_);

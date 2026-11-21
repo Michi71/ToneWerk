@@ -40,6 +40,41 @@ private:
     std::unique_ptr<juce::AudioProcessorValueTreeState::ComboBoxAttachment> attachment_;
 };
 
+// a number parameter as a compact bar with its value inside and its name to the left (the header)
+class NumberBar : public juce::Component
+{
+public:
+    NumberBar (juce::AudioProcessorValueTreeState& state, const char* id, const String& name, const String& tooltip)
+    {
+        label_.setText (name, juce::dontSendNotification);
+        label_.setJustificationType (juce::Justification::centredRight);
+        label_.setFont (juce::FontOptions (12.5f));
+        label_.setColour (juce::Label::textColourId, tw::colours::dim);
+        addAndMakeVisible (label_);
+        bar_.setSliderStyle (juce::Slider::LinearBar);
+        bar_.setColour (juce::Slider::trackColourId, tw::colours::accent.withAlpha (0.3f));
+        bar_.setColour (juce::Slider::textBoxTextColourId, tw::colours::text);
+        bar_.setColour (juce::Slider::textBoxOutlineColourId, tw::colours::panelEdge);
+        bar_.attachMidiLearn (tw::learnui::of (state), id, tooltip);
+        addAndMakeVisible (bar_);
+        attachment_ = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment> (state, id, bar_);
+        if (auto* p = state.getParameter (id))
+            bar_.setDoubleClickReturnValue (true, double (p->convertFrom0to1 (p->getDefaultValue())));
+    }
+    void resized() override
+    {
+        auto r = getLocalBounds();
+        const int labelWidth = r.getWidth() >= 120 ? 64 : 0; // a narrow window keeps the bar (the tooltip names it)
+        label_.setBounds (r.removeFromLeft (labelWidth));
+        bar_.setBounds (r.reduced (2, 3));
+    }
+
+private:
+    juce::Label label_;
+    tw::Learnable<juce::Slider> bar_;
+    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> attachment_;
+};
+
 // a bool parameter as a labelled switch, centred in its cell
 class Switch : public juce::Component
 {
@@ -269,6 +304,10 @@ PluginEditor::PluginEditor (PluginProcessor& p)
     humanize_ = std::make_unique<tw::Knob> (state, ids::humanize, "Humanize");
     velocityCurve_ = std::make_unique<tw::Knob> (state, ids::velocityCurve, "Velocity");
     polyphony_ = std::make_unique<ChoiceBox> (state, ids::polyphony, "Voices");
+    transpose_ = std::make_unique<NumberBar> (state, ids::transpose, "Transpose", "Transpose: shifts the keys by semitones");
+    tune_ = std::make_unique<NumberBar> (state, ids::tune, "Tune", "Tune: the pitch of the whole instrument in cents");
+    addAndMakeVisible (*transpose_);
+    addAndMakeVisible (*tune_);
     addAndMakeVisible (*polyphony_);
     for (auto* k : { volume_.get(), humanize_.get(), velocityCurve_.get() })
         addAndMakeVisible (*k);
@@ -405,6 +444,10 @@ void PluginEditor::resized()
     prevPreset_.setBounds (presetArea.removeFromLeft (32));
     presetArea.removeFromLeft (4);
     presetBox_.setBounds (presetArea);
+    header.removeFromRight (10);
+    header = header.removeFromRight (juce::jmin (header.getWidth(), 300));
+    transpose_->setBounds (header.removeFromLeft (header.getWidth() / 2));
+    tune_->setBounds (header);
 
     const int keyboardHeight = juce::jlimit (110, 180, getHeight() / 5);
     auto keys = r.removeFromBottom (keyboardHeight).reduced (12, 0).withTrimmedBottom (10);

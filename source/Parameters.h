@@ -68,6 +68,9 @@ namespace ids
     inline constexpr const char* polyphony = "polyphony";
     // fits the plugin to the keyboard: bends the velocity of every note-on (VelocityCurve.h)
     inline constexpr const char* velocityCurve = "velocity_curve";
+    // the keys shifted by semitones, and the pitch of the whole instrument in cents (a rebuild of the instrument)
+    inline constexpr const char* transpose = "transpose";
+    inline constexpr const char* tune = "tune";
 } // namespace ids
 
 // The instruments: presets of the three sound engines. The index is the value of the instrument parameter (saved in projects
@@ -98,7 +101,8 @@ juce::String voicingLabel (const juce::String& id, engines::Family family);
 
 juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout();
 
-// a setting of the player's keyboard, not of a sound: presets neither store nor change it (the velocity curve)
+// a setting of the player's keyboard or band, not of a sound: presets neither store nor change it (the velocity curve,
+// transpose, tune)
 bool isPlayerSetting (const juce::String& id);
 
 // every parameter ID, in layout order (presets, tests)

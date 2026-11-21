@@ -38,6 +38,9 @@ PluginProcessor::PluginProcessor()
     humanizeAmount_ = raw (ids::humanize);
     polyphony_ = raw (ids::polyphony);
     velocityCurve_ = raw (ids::velocityCurve);
+    transpose_ = raw (ids::transpose);
+    tune_ = raw (ids::tune);
+    keyMap_.fill (-1);
     fxp_ = { raw (ids::fxOn), raw (ids::fxVolume), raw (ids::fxDrive), raw (ids::fxEnvelope), raw (ids::fxBass), raw (ids::fxMid),
         raw (ids::fxMidFreq), raw (ids::fxTreble), raw (ids::panOn), raw (ids::panWave), raw (ids::panRate), raw (ids::panDepth),
         raw (ids::compOn), raw (ids::compAmount), raw (ids::compMakeup), raw (ids::chorusOn), raw (ids::chorusRate),
@@ -74,6 +77,7 @@ tw::VoiceConfig PluginProcessor::wantedConfig() const
     tw::VoiceConfig c;
     c.instrument = int (std::lround (instrument_->load()));
     c.maxVoices = tw::polyphonyVoices (int (std::lround (polyphony_->load())));
+    c.tuneCents = tune_->load();
     auto& v = c.voicing;
     v.hardness = hardness_->load();
     v.decay = decay_->load();
@@ -91,7 +95,7 @@ tw::VoiceConfig PluginProcessor::wantedConfig() const
 
 static int64_t signatureOf (const tw::VoiceConfig& c)
 {
-    auto h = int64_t (c.instrument) * 1000003 + int64_t (c.maxVoices) * 7919;
+    auto h = int64_t (c.instrument) * 1000003 + int64_t (c.maxVoices) * 7919 + int64_t (std::lround (c.tuneCents * 10.0f)) * 104729;
     for (float v : c.voicingValues())
         h = h * 31 + int64_t (std::lround (v * 100.0f));
     return h;
@@ -140,6 +144,12 @@ void PluginProcessor::run()
         built = want;
         haveBuilt = true;
     }
+}
+
+std::pair<int, int> PluginProcessor::instrumentKeys() const
+{
+    const int shift = int (std::lround (transpose_->load()));
+    return { juce::jlimit (0, 127, keyLo_.load() - shift), juce::jlimit (0, 127, keyHi_.load() - shift) };
 }
 
 juce::String PluginProcessor::instrumentStatus() const
@@ -245,7 +255,23 @@ void PluginProcessor::handleMidi (const juce::MidiMessage& m)
     }
     // the ringing voice gets no new strikes: only the releases of its own keys, the pedal and the other controllers
     auto* ringing = ringing_ ? fading_.get() : nullptr;
-    const auto key = size_t (m.getNoteNumber() & 127);
+    // a MIDI key plays the instrument's key a transposition away; its note-off releases that one, whatever the control says by then
+    size_t key = 0;
+    if (m.isNoteOn() || m.isNoteOff())
+    {
+        auto& mapped = keyMap_[size_t (m.getNoteNumber() & 127)];
+        if (m.isNoteOn())
+        {
+            const int k = m.getNoteNumber() + int (std::lround (transpose_->load()));
+            mapped = int8_t (k >= 0 && k <= 127 ? k : -1);
+        }
+        const int k = mapped;
+        if (m.isNoteOff())
+            mapped = -1;
+        if (k < 0)
+            return; // transposed off the MIDI range, or a release without a strike
+        key = size_t (k);
+    }
     auto releaseRinging = [&] {
         if (ringing == nullptr || !ringKeys_.test (key))
             return false;
@@ -273,6 +299,7 @@ void PluginProcessor::handleMidi (const juce::MidiMessage& m)
     {
         held_.reset();
         ringKeys_.reset();
+        keyMap_.fill (-1);
         if (ringing != nullptr)
             ringing->allNotesOff();
         if (active_ != nullptr)

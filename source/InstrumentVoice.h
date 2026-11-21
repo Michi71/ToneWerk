@@ -26,6 +26,7 @@ struct VoiceConfig
     int instrument = 0;
     engines::Voicing voicing;
     int maxVoices = 0; // polyphony limit, 0: every key
+    float tuneCents = 0; // pitch of the whole instrument: the resampler plays the engine this much faster or slower
 
     // the voicing controls in a fixed order (comparison, signature)
     std::array<float, 11> voicingValues() const
@@ -37,7 +38,7 @@ struct VoiceConfig
 
     bool operator== (const VoiceConfig& o) const
     {
-        if (instrument != o.instrument || maxVoices != o.maxVoices)
+        if (instrument != o.instrument || maxVoices != o.maxVoices || !juce::exactlyEqual (tuneCents, o.tuneCents))
             return false;
         const auto a = voicingValues(), b = o.voicingValues();
         for (size_t i = 0; i < a.size(); ++i)

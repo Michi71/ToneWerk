@@ -156,6 +156,7 @@ private:
     juce::TextButton prevPreset_ { "<" }, nextPreset_ { ">" }, savePreset_, deletePreset_;
     juce::ComboBox presetBox_;
     std::vector<tw::PresetManager::Entry> presetEntries_;
+    std::unique_ptr<juce::Component> transpose_, tune_; // the player's settings, left of the presets
     juce::String shownPreset_;
     bool shownFactory_ = false;
 

@@ -230,12 +230,14 @@ Layout createParameterLayout()
     // the player's keyboard, not the sound: presets leave it alone (isPlayerSetting)
     auto player = std::make_unique<juce::AudioProcessorParameterGroup> ("player", "Player", "|");
     player->addChild (number (ids::velocityCurve, "Velocity Curve", { -100.0f, 100.0f, 1.0f }, 0.0f, "%", 0));
+    player->addChild (number (ids::transpose, "Transpose", { -12.0f, 12.0f, 1.0f }, 0.0f, "st", 0));
+    player->addChild (number (ids::tune, "Tune", { -100.0f, 100.0f, 0.1f }, 0.0f, "ct", 1));
     layout.add (std::move (player));
 
     return layout;
 }
 
-bool isPlayerSetting (const juce::String& id) { return id == ids::velocityCurve; }
+bool isPlayerSetting (const juce::String& id) { return id == ids::velocityCurve || id == ids::transpose || id == ids::tune; }
 
 const juce::StringArray& allParameterIds()
 {
@@ -249,7 +251,7 @@ const juce::StringArray& allParameterIds()
         ids::humanize,
         ids::hammerMass, ids::strikePoint, ids::gauge, ids::pickupGap, ids::pickupOffset, ids::tonebarDetune, ids::damperRelease,
         ids::polyphony,
-        ids::velocityCurve
+        ids::velocityCurve, ids::transpose, ids::tune
     };
     return all;
 }

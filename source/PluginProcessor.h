@@ -11,6 +11,7 @@
 // MIDI that changes the plugin itself (a learned CC, a program change) is not acted on in processBlock: the audio thread leaves
 // it in atomic slots and a timer on the message thread sets the parameters or loads the preset, notifying the host.
 #pragma once
+#include <array>
 #include <bitset>
 
 #include <juce_audio_processors/juce_audio_processors.h>
@@ -71,7 +72,7 @@ public:
     // what the loaded instrument says about itself (engine, rate); message thread
     juce::String instrumentStatus() const;
     // the keys the loaded instrument plays (MIDI notes); any thread
-    std::pair<int, int> instrumentKeys() const { return { keyLo_.load(), keyHi_.load() }; }
+    std::pair<int, int> instrumentKeys() const; // as played: shifted by the transposition
     // the strike variation's random sequence, for repeatable tests
     void seedHumanize (uint64_t seed) { humanize_.seed (seed); }
     // true when the voice built for the current parameters plays (tests; the audio thread adopts it in processBlock)
@@ -118,6 +119,7 @@ private:
     std::atomic<float>* humanizeAmount_ = nullptr;
     std::atomic<float>* polyphony_ = nullptr;
     std::atomic<float>* velocityCurve_ = nullptr;
+    std::atomic<float>*transpose_ = nullptr, *tune_ = nullptr;
     struct FxParams
     {
         std::atomic<float>*on, *volume, *drive, *envelope, *bass, *mid, *midFreq, *treble, *panOn, *panWave, *panRate, *panDepth,
@@ -147,7 +149,8 @@ private:
     // the voice before a voicing change rings out in fading_ at full gain until its notes have decayed, then fades
     bool ringing_ = false;
     std::atomic<bool> ringingFlag_ { false };
-    std::bitset<128> held_;     // keys down now
+    std::array<int8_t, 128> keyMap_ {}; // the instrument's key a MIDI key struck (its note-off follows a changed transposition); -1: none
+    std::bitset<128> held_;     // the instrument's keys down now
     std::bitset<128> ringKeys_; // keys struck on the ringing voice and still down: their note-off belongs to it
     int64_t ringFrames_ = 0, ringQuiet_ = 0, ringQuietFrames_ = 24000, ringMaxFrames_ = 2880000;
     int sustain_ = 0;

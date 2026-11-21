@@ -888,3 +888,103 @@ TEST_CASE ("The velocity curve changes how loud a touch plays and survives prese
     REQUIRE (presets.loadUser ("Curve"));
     CHECK (std::abs (plugin.state().getRawParameterValue (tw::ids::velocityCurve)->load() + 25.0f) < 0.01f);
 }
+
+namespace
+{
+// strikes a key, holds it for 0.6 s and returns the frequency of the tone: the lag of the autocorrelation peak near `expected`
+double pitchOf (PluginProcessor& p, int note, double expected)
+{
+    std::vector<float> x;
+    juce::AudioBuffer<float> buffer (2, 512);
+    for (int b = 0; b < 160; ++b)
+    {
+        juce::MidiBuffer midi;
+        if (b == 0)
+            midi.addEvent (juce::MidiMessage::noteOn (1, note, (juce::uint8) 90), 0);
+        if (b == 56)
+            midi.addEvent (juce::MidiMessage::noteOff (1, note), 0);
+        buffer.clear();
+        p.processBlock (buffer, midi);
+        if (b >= 10 && b < 56) // after the attack
+            x.insert (x.end(), buffer.getReadPointer (0), buffer.getReadPointer (0) + 512);
+    }
+    auto corr = [&] (int lag) {
+        double sum = 0.0;
+        for (size_t i = 0; i + size_t (lag) < x.size(); ++i)
+            sum += double (x[i]) * x[i + size_t (lag)];
+        return sum / double (x.size() - size_t (lag));
+    };
+    const int lo = int (48000.0 / (expected * 1.12)), hi = int (48000.0 / (expected / 1.12)) + 1;
+    int best = lo;
+    for (int lag = lo; lag <= hi; ++lag)
+        if (corr (lag) > corr (best))
+            best = lag;
+    const double a = corr (best - 1), b = corr (best), c = corr (best + 1);
+    const double peak = double (best) + 0.5 * (a - c) / (a - 2.0 * b + c);
+    return 48000.0 / peak;
+}
+} // namespace
+
+TEST_CASE ("Transpose shifts the keys and Tune the pitch", "[audio][tuning]")
+{
+    for (const int i : { 0, instrumentCount() - 1 }) // a physical model (resampled anyway) and a hybrid voice (at the host rate)
+    {
+        PluginProcessor plugin;
+        plugin.setRateAndBufferSizeDetails (48000.0, 512);
+        plugin.prepareToPlay (48000.0, 512);
+        setParam (plugin, tw::ids::humanize, 0.0f);
+        setParam (plugin, tw::ids::instrument, float (i));
+        REQUIRE (waitForInstrumentAlone (plugin, 512));
+        const auto keys = plugin.instrumentKeys();
+
+        const double a4 = pitchOf (plugin, 69, 440.0);
+        CHECK (std::abs (1200.0 * std::log2 (a4 / 440.0)) < 15.0);
+
+        // an octave up: the A below plays the same pitch, and the playable keys move down with it
+        setParam (plugin, tw::ids::transpose, 12.0f);
+        const double shifted = pitchOf (plugin, 57, 440.0);
+        CHECK (std::abs (1200.0 * std::log2 (shifted / a4)) < 3.0);
+        CHECK (plugin.instrumentKeys().first == juce::jmax (0, keys.first - 12));
+        CHECK (plugin.instrumentKeys().second == keys.second - 12);
+        setParam (plugin, tw::ids::transpose, 0.0f);
+
+        for (const float cents : { 50.0f, -100.0f })
+        {
+            setParam (plugin, tw::ids::tune, cents);
+            REQUIRE (waitForInstrumentAlone (plugin, 512));
+            const double tuned = pitchOf (plugin, 69, 440.0);
+            WARN (tw::instrumentId (i) << " tune " << cents << " ct: " << juce::String (1200.0 * std::log2 (tuned / a4), 1) << " ct");
+            CHECK (std::abs (1200.0 * std::log2 (tuned / a4) - double (cents)) < 3.0);
+        }
+    }
+}
+
+TEST_CASE ("A key releases the note it struck when the transposition changes meanwhile", "[audio][tuning]")
+{
+    PluginProcessor plugin;
+    plugin.setRateAndBufferSizeDetails (48000.0, 512);
+    plugin.prepareToPlay (48000.0, 512);
+    REQUIRE (waitForInstrument (plugin, 512));
+    auto run = [&] (juce::MidiBuffer midi, int blocks) {
+        juce::AudioBuffer<float> buffer (2, 512);
+        double sum = 0.0;
+        for (int b = 0; b < blocks; ++b)
+        {
+            buffer.clear();
+            plugin.processBlock (buffer, midi);
+            midi.clear();
+            if (b >= blocks - 10)
+                for (int k = 0; k < 512; ++k)
+                    sum += double (buffer.getSample (0, k)) * buffer.getSample (0, k);
+        }
+        return std::sqrt (sum / 5120.0);
+    };
+    juce::MidiBuffer on, off;
+    on.addEvent (juce::MidiMessage::noteOn (1, 60, (juce::uint8) 100), 0);
+    off.addEvent (juce::MidiMessage::noteOff (1, 60), 0);
+    const double sounding = run (on, 30);
+    REQUIRE (sounding > 1e-4);
+    setParam (plugin, tw::ids::transpose, 5.0f);
+    const double released = run (off, 280); // 3 s: the damper has it
+    CHECK (released < 0.01 * sounding);
+}
