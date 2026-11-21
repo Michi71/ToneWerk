@@ -56,12 +56,25 @@ compiled into it. The engines render mono; the effect chain and the reverb make 
 - **Volume** (−48 … +12 dB) after the effect chain, followed by a peak limiter (attack 0.1 ms, release 120 ms, no lookahead)
   and the soft clip as the last safeguard: full chords are turned down instead of distorted. Per-instrument trims level the
   instruments at C4 velocity 100 (`instruments()` in `source/Parameters.cpp`, measured with `./Builds/Tests "[.levels]"`).
+- **Level meter** (under the instrument's name): the output peak of each channel after the limiter and the soft clip, from
+  −48 to 0 dBFS. The mark is the limiter's threshold (−1.4 dBFS); **LIM** lights while the limiter holds a peak back:
+  then Volume, or the preset's level, is higher than the output can carry cleanly.
 - **Humanize** (0–100 %, default 50 %): every strike scatters a little, so no two notes are bit for bit the same. The velocity
   is multiplied by a random factor exp(σ g); 50 % is the physical presets' hammer-speed scatter (`human.speed` 0.05) carried
   over to the velocity (σ 0.038 of ln velocity), 100 % twice that. Level and timbre move: at 100 % the level of repeated
   strikes scatters by about 1 dB. Applies to every instrument; the physical models are built without their own speed scatter
   (they keep the scatter of the felt, `human.contact`). At 0 % the hybrid voices repeat a strike bit for bit (at the bank's
   rate).
+- **Velocity** (−100 … +100 %, default 0 %): fits the plugin to the keyboard. A power curve bends the velocity of every
+  note-on before the strike variation: positive values make a light touch play louder (velocity 64 plays as 90 at +100 %),
+  negative ones make it softer (64 plays as 32 at −100 %); the softest and the hardest strike stay where they are.
+  Presets store it like every other control.
+- **Transpose** (−12 … +12 semitones) and **Tune** (−100 … +100 cents), in the header: Transpose shifts the keys (the
+  keyboard shows the keys that play; a held key releases the note it struck even when the value changes meanwhile). Tune
+  moves the pitch of the whole instrument, to a band's or a recording's reference: the rate conversion plays the engine's
+  output that much faster or slower, so the decay times change with it by 6 % at most, and a hybrid voice passes the
+  resampler too while Tune is not 0. A change of Tune rebuilds the instrument like a voicing control (sounding notes ring
+  out at the old pitch). Presets store both.
 - **Voices** (polyphony): *All* (default) or a limit of 64 … 8 keys for slower computers. Over the limit a new key makes the
   quietest voice fade out in 20–30 ms without a click (a released key before a held one). Changing it rebuilds the instrument.
   Measured on an Apple M4 Max at 48 kHz with the effect chain and the reverb on, every key held with the pedal costs 4–9 % of
@@ -70,13 +83,17 @@ compiled into it. The engines render mono; the effect chain and the reverb make 
 - **Voicing**: the controls of the instrument's engine on top of its calibration. The physical models take the technician's
   controls (hardness, hammer mass, strike point, tine or reed gauge, pickup gap and offset, the Rhodes' tonebar, damper), the
   hybrid voices hardness, decay, unison and stretch on their poles ([docs/INSTRUMENTS.md](docs/INSTRUMENTS.md)). Every change
-  rebuilds the instrument (after 250 ms without further changes); sounding notes stop. A harder or heavier hammer or a thinner
+  rebuilds the instrument (after 250 ms without further changes). Sounding notes ring out with the voicing they were struck
+  with, pedal and key releases included, while every new strike plays the new voicing; for that time two instruments compute.
+  A further change while notes still ring out fades them in 30 ms (two instruments at most). A harder or heavier hammer or a thinner
   tine or reed integrates the hammer contact with 32 sub-steps instead of 2, and hammer mass (+100 %) and gauge (−30 %) stop
   short of where combined extremes ran away. The settings stay when the instrument
   changes, and extremes carry over: **Reset** sets every control back to the instrument as calibrated.
 - **Effects**: the MK8 chain in the units of the Rhodes V8 Pro – preamp (drive, envelope, level), equalizer, Vari-Pan,
   compressor, chorus, phaser, delay. The **FX** switch bypasses the whole chain; like the reverb switch it cross-fades over
-  20 ms, so switching while playing does not click.
+  20 ms, so switching while playing does not click. On a mono output the chain and the reverb run in stereo and the two
+  channels are summed: the Vari-Pan then acts as a tremolo, and at full depth the sum is about 12 dB quieter (measured with
+  the square wave).
 - **Reverb** at the end, on its own switch (independent of **FX**, so the grands get a room without the MK8 preamp): mix, size,
   decay (RT60 0.3–10 s), damping (how much faster the highs die away), pre-delay (0–200 ms), width. The grand presets have it on;
   Steinway and Grandpa's with less, their recordings carry some room already.
@@ -108,6 +125,10 @@ compiled into it. The engines render mono; the effect chain and the reverb make 
   input samples (0.54 ms); passband flat to ±0.03 dB up to 18 kHz, 83–97 dB signal-to-noise (`tests/ResamplerTests.cpp`). The
   hybrid voices run at the host rate and resample their banks themselves. `./Builds/Tests "[.latency]"` measures the time from note-on to the attack for
   every instrument.
+- **Latency:** the plugin reports one latency to the host, the same for every instrument and tuning: the resampler's
+  lookahead at its lowest ratio (a physical model tuned 100 cents down), 26 frames at 44.1 kHz, 28 at 48 kHz, about
+  0.58 ms. A voice with less delay of its own (a hybrid voice, a physical model at 44.1 kHz) delays its output by the
+  rest, so the host's compensation is right for all of them and need not change when the instrument does.
 - The screenshot above is rendered by a hidden test: `TONEWERK_SNAPSHOT=$PWD/docs/images/tonewerk.png ./Builds/Tests "[.snapshot]"`.
 - The three engines all call themselves `pmp::Engine`; each is built as its own library with the namespace renamed and reached
   through one interface (`engine/adapters/sound_engine.h`, [engine/UPSTREAM.md](engine/UPSTREAM.md)).

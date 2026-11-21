@@ -18,11 +18,18 @@ public:
     static constexpr double kAttackMs = 0.1, kReleaseMs = 120.0;
 
     void prepare (double sampleRate);
-    void reset() { gain_ = 1.0f; }
+    void reset() { gain_ = minGain_ = 1.0f; }
     void process (float* left, float* right, int n); // right may be nullptr (mono)
     float gain() const { return gain_; }
+    // the lowest gain since the last call (a meter): 1 when the limiter held nothing back
+    float takeMinGain()
+    {
+        const float g = minGain_;
+        minGain_ = gain_;
+        return g;
+    }
 
 private:
-    float gain_ = 1.0f, attack_ = 1.0f, release_ = 0.0f;
+    float gain_ = 1.0f, minGain_ = 1.0f, attack_ = 1.0f, release_ = 0.0f;
 };
 } // namespace tw

@@ -23,7 +23,7 @@ public:
         addAndMakeVisible (label_);
         if (auto* p = dynamic_cast<juce::AudioParameterChoice*> (state.getParameter (id)))
             box_.addItemList (p->choices, 1);
-        box_.attachMidiLearn (tw::learnui::of (state), id, name);
+        box_.attachMidiLearn (tw::learnui::of (state), id, tw::learnui::describe (name, id, tw::engines::Family::Tines));
         addAndMakeVisible (box_);
         attachment_ = std::make_unique<juce::AudioProcessorValueTreeState::ComboBoxAttachment> (state, id, box_);
     }
@@ -40,6 +40,105 @@ private:
     std::unique_ptr<juce::AudioProcessorValueTreeState::ComboBoxAttachment> attachment_;
 };
 
+// a number parameter as a compact bar with its value inside and its name to the left (the header)
+class NumberBar : public juce::Component
+{
+public:
+    NumberBar (juce::AudioProcessorValueTreeState& state, const char* id, const String& name, const String& tooltip)
+    {
+        label_.setText (name, juce::dontSendNotification);
+        label_.setJustificationType (juce::Justification::centredRight);
+        label_.setFont (juce::FontOptions (12.5f));
+        label_.setColour (juce::Label::textColourId, tw::colours::dim);
+        addAndMakeVisible (label_);
+        bar_.setSliderStyle (juce::Slider::LinearBar);
+        bar_.setColour (juce::Slider::trackColourId, tw::colours::accent.withAlpha (0.3f));
+        bar_.setColour (juce::Slider::textBoxTextColourId, tw::colours::text);
+        bar_.setColour (juce::Slider::textBoxOutlineColourId, tw::colours::panelEdge);
+        bar_.attachMidiLearn (tw::learnui::of (state), id, tooltip);
+        addAndMakeVisible (bar_);
+        attachment_ = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment> (state, id, bar_);
+        if (auto* p = state.getParameter (id))
+            bar_.setDoubleClickReturnValue (true, double (p->convertFrom0to1 (p->getDefaultValue())));
+    }
+    void resized() override
+    {
+        auto r = getLocalBounds();
+        const int labelWidth = r.getWidth() >= 120 ? 64 : 0; // a narrow window keeps the bar (the tooltip names it)
+        label_.setBounds (r.removeFromLeft (labelWidth));
+        bar_.setBounds (r.reduced (2, 3));
+    }
+
+private:
+    juce::Label label_;
+    tw::Learnable<juce::Slider> bar_;
+    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> attachment_;
+};
+
+// the output level: a bar per channel from -48 to 0 dBFS (peak, falling back slowly) and a light for the limiter
+class LevelMeter : public juce::Component, public juce::SettableTooltipClient, private juce::Timer
+{
+public:
+    explicit LevelMeter (PluginProcessor& p) : processor_ (p)
+    {
+        setTooltip ("Output level, -48 to 0 dBFS. The mark is the limiter's threshold; LIM lights while it holds a peak back.");
+        startTimerHz (30);
+    }
+    void paint (juce::Graphics& g) override
+    {
+        using namespace tw::colours;
+        auto r = getLocalBounds().toFloat();
+        auto light = r.removeFromRight (30.0f);
+        r.removeFromRight (4.0f);
+        const float mark = r.getX() + r.getWidth() * position (tw::Limiter::kThreshold);
+        const float barHeight = juce::jmax (2.0f, (r.getHeight() - 2.0f) * 0.5f);
+        for (int ch = 0; ch < 2; ++ch)
+        {
+            const auto bar = r.withHeight (barHeight).withY (r.getY() + float (ch) * (barHeight + 2.0f));
+            g.setColour (knob);
+            g.fillRoundedRectangle (bar, 1.5f);
+            const float end = bar.getX() + bar.getWidth() * position (level_[ch]);
+            g.setColour (accent.withAlpha (0.85f));
+            g.fillRoundedRectangle (bar.withRight (juce::jmin (end, mark)), 1.5f);
+            if (end > mark)
+            {
+                g.setColour (hot_);
+                g.fillRect (bar.withLeft (mark).withRight (end));
+            }
+        }
+        g.setColour (dim);
+        g.fillRect (mark, r.getY(), 1.0f, r.getHeight());
+        g.setColour (limiting_ > 0 ? hot_ : dim.withAlpha (0.5f));
+        g.setFont (juce::FontOptions (10.0f, juce::Font::bold));
+        g.drawText ("LIM", light, juce::Justification::centred);
+    }
+
+private:
+    static float position (float gain) // 0..1 along the bar
+    {
+        return juce::jlimit (0.0f, 1.0f, 1.0f + juce::Decibels::gainToDecibels (gain, -48.0f) / 48.0f);
+    }
+    void timerCallback() override
+    {
+        const auto now = processor_.takeOutputLevel();
+        const float fall = 0.89f; // -1 dB a frame: 30 dB/s
+        const float before[] { level_[0], level_[1] };
+        level_[0] = juce::jmax (now.left, level_[0] * fall);
+        level_[1] = juce::jmax (now.right, level_[1] * fall);
+        const int was = limiting_;
+        limiting_ = now.limiterGain < 0.999f ? 9 : juce::jmax (0, limiting_ - 1); // stays lit for 0.3 s
+        const bool moved = std::abs (position (level_[0]) - position (before[0])) > 1e-4f
+                           || std::abs (position (level_[1]) - position (before[1])) > 1e-4f;
+        if (moved || (was > 0) != (limiting_ > 0))
+            repaint();
+    }
+
+    PluginProcessor& processor_;
+    float level_[2] { 0.0f, 0.0f };
+    int limiting_ = 0;
+    const juce::Colour hot_ { 0xffe0523a };
+};
+
 // a bool parameter as a labelled switch, centred in its cell
 class Switch : public juce::Component
 {
@@ -50,7 +149,7 @@ public:
         label_.setJustificationType (juce::Justification::centred);
         label_.setFont (juce::FontOptions (12.5f));
         addAndMakeVisible (label_);
-        button_.attachMidiLearn (tw::learnui::of (state), id, name);
+        button_.attachMidiLearn (tw::learnui::of (state), id, tw::learnui::describe (name, id, tw::engines::Family::Tines));
         addAndMakeVisible (button_);
         attachment_ = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment> (state, id, button_);
     }
@@ -105,6 +204,12 @@ namespace learnui
         m.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&target).withMousePosition());
     }
 
+    String describe (const String& name, const String& parameterId, engines::Family family)
+    {
+        const auto help = tw::parameterHelp (parameterId, family);
+        return help.isEmpty() ? name : name + ": " + help;
+    }
+
     String tooltip (const String& base, int cc, bool learning)
     {
         if (learning)
@@ -140,7 +245,7 @@ namespace learnui
 } // namespace learnui
 
 Knob::Knob (juce::AudioProcessorValueTreeState& state, const String& id, const String& name)
-    : attachment_ (state, id, slider_)
+    : id_ (id), attachment_ (state, id, slider_)
 {
     slider_.setSliderStyle (juce::Slider::RotaryHorizontalVerticalDrag);
     // set here: the text box is created before the knob has a parent with the plugin's look
@@ -154,13 +259,20 @@ Knob::Knob (juce::AudioProcessorValueTreeState& state, const String& id, const S
         slider_.setDoubleClickReturnValue (true, double (p->convertFrom0to1 (p->getDefaultValue())));
         slider_.textFromValueFunction = [p] (double v) { return p->getText (p->convertTo0to1 (float (v)), 16); };
         slider_.updateText();
-        slider_.attachMidiLearn (learnui::of (state), id, p->getName (64));
+        parameterName_ = p->getName (64);
+        slider_.attachMidiLearn (learnui::of (state), id, learnui::describe (parameterName_, id, engines::Family::Tines));
     }
     label_.setText (name, juce::dontSendNotification);
     label_.setJustificationType (juce::Justification::centred);
     label_.setFont (juce::FontOptions (12.5f));
     addAndMakeVisible (slider_);
     addAndMakeVisible (label_);
+}
+
+void Knob::setTitle (const String& name, engines::Family family)
+{
+    label_.setText (name, juce::dontSendNotification);
+    slider_.setTooltipText (learnui::describe (parameterName_, id_, family));
 }
 
 void Knob::resized()
@@ -175,7 +287,7 @@ Section::Section (const String& title, juce::AudioProcessorValueTreeState& state
     if (switchId != nullptr)
     {
         switch_ = std::make_unique<Learnable<juce::ToggleButton>>();
-        switch_->attachMidiLearn (learnui::of (state), switchId, title + " on/off");
+        switch_->attachMidiLearn (learnui::of (state), switchId, learnui::describe (title + " on/off", switchId, engines::Family::Tines));
         addAndMakeVisible (*switch_);
         switchAttachment_ = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment> (state, switchId, *switch_);
     }
@@ -256,7 +368,8 @@ PluginEditor::PluginEditor (PluginProcessor& p)
 
     // instrument
     instrumentBox_.addItemList (tw::instrumentNames(), 1);
-    instrumentBox_.attachMidiLearn (&p.midiLearn(), ids::instrument, "Instrument");
+    instrumentBox_.attachMidiLearn (&p.midiLearn(), ids::instrument,
+        tw::learnui::describe ("Instrument", ids::instrument, tw::engines::Family::Tines));
     addAndMakeVisible (instrumentBox_);
     instrumentAttachment_ = std::make_unique<juce::AudioProcessorValueTreeState::ComboBoxAttachment> (state, ids::instrument,
         instrumentBox_);
@@ -267,9 +380,17 @@ PluginEditor::PluginEditor (PluginProcessor& p)
     addAndMakeVisible (status_);
     volume_ = std::make_unique<tw::Knob> (state, ids::volume, "Volume");
     humanize_ = std::make_unique<tw::Knob> (state, ids::humanize, "Humanize");
+    velocityCurve_ = std::make_unique<tw::Knob> (state, ids::velocityCurve, "Velocity");
     polyphony_ = std::make_unique<ChoiceBox> (state, ids::polyphony, "Voices");
+    meter_ = std::make_unique<LevelMeter> (p);
+    addAndMakeVisible (*meter_);
+    transpose_ = std::make_unique<NumberBar> (state, ids::transpose, "Transpose",
+        tw::learnui::describe ("Transpose", ids::transpose, tw::engines::Family::Tines));
+    tune_ = std::make_unique<NumberBar> (state, ids::tune, "Tune", tw::learnui::describe ("Tune", ids::tune, tw::engines::Family::Tines));
+    addAndMakeVisible (*transpose_);
+    addAndMakeVisible (*tune_);
     addAndMakeVisible (*polyphony_);
-    for (auto* k : { volume_.get(), humanize_.get() })
+    for (auto* k : { volume_.get(), humanize_.get(), velocityCurve_.get() })
         addAndMakeVisible (*k);
     for (const auto& id : tw::allVoicingIds())
     {
@@ -283,7 +404,7 @@ PluginEditor::PluginEditor (PluginProcessor& p)
 
     // effects
     fxOn_.setButtonText ("FX");
-    fxOn_.attachMidiLearn (&p.midiLearn(), ids::fxOn, "Effect chain on/off");
+    fxOn_.attachMidiLearn (&p.midiLearn(), ids::fxOn, tw::learnui::describe ("Effect chain on/off", ids::fxOn, tw::engines::Family::Tines));
     addAndMakeVisible (fxOn_);
     fxOnAttachment_ = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment> (state, ids::fxOn, fxOn_);
     auto knob = [&state] (const char* id, const char* name) { return std::make_unique<tw::Knob> (state, id, utf8 (name)); };
@@ -404,6 +525,10 @@ void PluginEditor::resized()
     prevPreset_.setBounds (presetArea.removeFromLeft (32));
     presetArea.removeFromLeft (4);
     presetBox_.setBounds (presetArea);
+    header.removeFromRight (10);
+    header = header.removeFromRight (juce::jmin (header.getWidth(), 300));
+    transpose_->setBounds (header.removeFromLeft (header.getWidth() / 2));
+    tune_->setBounds (header);
 
     const int keyboardHeight = juce::jlimit (110, 180, getHeight() / 5);
     auto keys = r.removeFromBottom (keyboardHeight).reduced (12, 0).withTrimmedBottom (10);
@@ -423,12 +548,15 @@ void PluginEditor::resized()
     ip.removeFromTop (36);
     instrumentBox_.setBounds (ip.removeFromTop (34));
     ip.removeFromTop (6);
-    status_.setBounds (ip.removeFromTop (36));
+    auto statusRow = ip.removeFromTop (36);
+    status_.setBounds (statusRow.removeFromTop (20));
+    meter_->setBounds (statusRow.withTrimmedTop (3).withTrimmedBottom (3).reduced (2, 0));
     ip.removeFromBottom (10);
     auto vol = ip.removeFromTop (juce::jmin (130, ip.getHeight() / 3));
-    const int third = vol.getWidth() / 3;
-    volume_->setBounds (vol.removeFromLeft (third));
-    humanize_->setBounds (vol.removeFromLeft (third));
+    const int quarter = vol.getWidth() / 4;
+    volume_->setBounds (vol.removeFromLeft (quarter));
+    humanize_->setBounds (vol.removeFromLeft (quarter));
+    velocityCurve_->setBounds (vol.removeFromLeft (quarter));
     polyphony_->setBounds (vol.withSizeKeepingCentre (vol.getWidth() - 8, juce::jmin (vol.getHeight(), 60)));
     ip.removeFromTop (8);
     voicingTitle_ = ip.removeFromTop (26);
@@ -482,7 +610,7 @@ void PluginEditor::showInstrument()
     for (auto& [id, knob] : voicing_)
     {
         knob->setVisible (shownVoicing_.contains (id));
-        knob->setTitle (tw::voicingLabel (id, family));
+        knob->setTitle (tw::voicingLabel (id, family), family);
     }
     if (keys.first <= keys.second)
         keyboard_.setAvailableRange (keys.first, keys.second);

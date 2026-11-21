@@ -5,6 +5,7 @@
 #include "Parameters.h"
 
 #include <cmath>
+#include <utility>
 
 namespace tw
 {
@@ -23,18 +24,41 @@ InstrumentVoice::InstrumentVoice (const VoiceConfig& config) : config_ (config)
         status_ = "Not available (" + juce::String (err) + ")";
 }
 
-void InstrumentVoice::prepare (double hostRate, int maxFrames)
+int InstrumentVoice::latencyFor (double hostRate)
 {
+    const double lowestRatio = juce::jmin (1.0, kCalibrationRate / hostRate) * std::exp2 (-kMaxTuneCents / 1200.0);
+    return int (std::ceil (Resampler::kHalfTaps / lowestRatio));
+}
+
+void InstrumentVoice::delay (float* x, int n)
+{
+    if (pad_.empty())
+        return;
+    for (int i = 0; i < n; ++i)
+    {
+        std::swap (x[i], pad_[padAt_]);
+        if (++padAt_ == pad_.size())
+            padAt_ = 0;
+    }
+}
+
+void InstrumentVoice::prepare (double hostRate, int maxFrames, int latencyFrames)
+{
+    pad_.clear();
+    padAt_ = 0;
     hostRate_ = hostRate;
     maxFrames_ = juce::jmax (1, maxFrames);
     if (engine_ == nullptr)
         return;
     engineRate_ = engine_->rateFor (hostRate_);
     engine_->prepare (engineRate_);
-    const double ratio = engineRate_ / hostRate_;
+    // the tuning rides on the rate conversion: reading the engine's output faster raises every pitch (and shortens the
+    // decay by the same 6 % at most); a hybrid voice, at the host rate otherwise, gets the resampler for it
+    const double ratio = engineRate_ / hostRate_ * std::exp2 (double (config_.tuneCents) / 1200.0);
     resample_ = std::abs (ratio - 1.0) > 1e-9;
     if (resample_)
         resampler_.prepare (ratio, maxFrames_);
+    pad_.assign (size_t (juce::jmax (0, int (std::lround (double (latencyFrames) - ownLatency())))), 0.0f);
 
     const auto dot = juce::String::fromUTF8 (" \xc2\xb7 ");
     const auto rate = juce::String (engineRate_ / 1000.0, 1) + " kHz";
@@ -80,6 +104,7 @@ void InstrumentVoice::render (float* left, float* right, int n)
             failed_.store (true);
             juce::FloatVectorOperations::clear (left, n);
         }
+        delay (left, n);
         juce::FloatVectorOperations::copy (right, left, n);
         return;
     }
@@ -98,5 +123,10 @@ void InstrumentVoice::render (float* left, float* right, int n)
         resampler_.appended (m);
     }
     resampler_.process (left, right, n);
+    if (!pad_.empty())
+    {
+        delay (left, n); // mono: both channels carry the same
+        juce::FloatVectorOperations::copy (right, left, n);
+    }
 }
 } // namespace tw

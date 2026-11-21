@@ -7,6 +7,7 @@
 #include <PluginEditor.h>
 #include <PluginProcessor.h>
 #include <PresetManager.h>
+#include <VelocityCurve.h>
 
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_string.hpp>
@@ -31,6 +32,19 @@ bool waitForInstrument (PluginProcessor& p, int blockSize, double seconds = 30.0
         juce::Thread::sleep (5);
     }
     return false;
+}
+
+// waits for the voice of the current parameters and then for the one before it: after a voicing change that one rings out
+// next to the new voice, which a measurement must not include (release the keys first)
+bool waitForInstrumentAlone (PluginProcessor& p, int blockSize)
+{
+    if (!waitForInstrument (p, blockSize))
+        return false;
+    juce::AudioBuffer<float> buffer (2, blockSize);
+    juce::MidiBuffer midi;
+    for (int b = 0; b < int (90.0 * 48000.0 / blockSize) && p.ringingOut(); ++b)
+        p.processBlock (buffer, midi);
+    return !p.ringingOut();
 }
 
 // plays one note for `seconds` and returns the RMS of the left and right channel
@@ -433,7 +447,7 @@ TEST_CASE ("Voicing extremes per instrument", "[.voicing]")
                 continue; // not a control of this instrument
             for (const auto& s : set)
                 setParam (plugin, s.id, s.value);
-            REQUIRE (waitForInstrument (plugin, 512));
+            REQUIRE (waitForInstrumentAlone (plugin, 512));
             juce::AudioBuffer<float> buffer (2, 512);
             double sum = 0.0, diff = 0.0, peak = 0.0;
             float last = 0.0f;
@@ -454,6 +468,9 @@ TEST_CASE ("Voicing extremes per instrument", "[.voicing]")
                     last = x;
                 }
             }
+            juce::MidiBuffer off;
+            off.addEvent (juce::MidiMessage::allNotesOff (1), 0);
+            plugin.processBlock (buffer, off);
             const double rms = std::sqrt (sum / 48000.0), bright = std::sqrt (diff / std::max (sum, 1e-30));
             if (set.empty())
                 rms0 = rms, bright0 = bright;
@@ -463,6 +480,65 @@ TEST_CASE ("Voicing extremes per instrument", "[.voicing]")
                   << ", brightness " << juce::String (20.0 * std::log10 (bright / bright0), 1) << " dB"
                   << (std::isfinite (rms) ? "" : "  NOT FINITE"));
         }
+    }
+}
+
+TEST_CASE ("A voicing change lets the sounding notes ring out", "[audio][voicing]")
+{
+    auto rmsOf = [] (PluginProcessor& p, juce::MidiBuffer midi, double seconds) {
+        juce::AudioBuffer<float> buffer (2, 512);
+        double sum = 0.0;
+        const int blocks = int (seconds * 48000.0 / 512);
+        for (int b = 0; b < blocks; ++b)
+        {
+            buffer.clear();
+            p.processBlock (buffer, midi);
+            midi.clear();
+            for (int k = 0; k < 512; ++k)
+                sum += double (buffer.getSample (0, k)) * buffer.getSample (0, k);
+        }
+        return std::sqrt (sum / (blocks * 512.0));
+    };
+    for (int i = 0; i < instrumentCount(); ++i)
+    {
+        PluginProcessor plugin;
+        plugin.setRateAndBufferSizeDetails (48000.0, 512);
+        plugin.prepareToPlay (48000.0, 512);
+        setParam (plugin, tw::ids::instrument, float (i));
+        REQUIRE (waitForInstrument (plugin, 512));
+
+        juce::MidiBuffer on;
+        on.addEvent (juce::MidiMessage::noteOn (1, 48, (juce::uint8) 100), 0);
+        const double before = rmsOf (plugin, on, 0.1);
+        REQUIRE (before > 1e-4);
+        CHECK_FALSE (plugin.ringingOut());
+
+        // the key stays down while the voicing changes: the note keeps sounding in the old voice
+        setParam (plugin, tw::ids::hardness, 50.0f);
+        REQUIRE (waitForInstrument (plugin, 512));
+        CHECK (plugin.ringingOut());
+        const double held = rmsOf (plugin, {}, 0.1);
+        WARN (tw::instrumentId (i).paddedRight (' ', 10) << " held note after the change: "
+                                                         << juce::String (20.0 * std::log10 (held / before), 1) << " dB");
+        CHECK (held > 1e-4);
+
+        // a new strike plays in the new voice, next to the ringing one
+        juce::MidiBuffer second;
+        second.addEvent (juce::MidiMessage::noteOn (1, 60, (juce::uint8) 100), 0);
+        CHECK (rmsOf (plugin, second, 0.1) > held);
+
+        // the release of the old key reaches the old voice: it damps, and the voice is handed back
+        juce::MidiBuffer off;
+        off.addEvent (juce::MidiMessage::noteOff (1, 48), 0);
+        off.addEvent (juce::MidiMessage::noteOff (1, 60), 0);
+        rmsOf (plugin, off, 0.1);
+        bool rungOut = false;
+        for (int t = 0; t < 200 && !rungOut; ++t)
+        {
+            rmsOf (plugin, {}, 0.1);
+            rungOut = !plugin.ringingOut();
+        }
+        CHECK (rungOut);
     }
 }
 
@@ -672,7 +748,7 @@ TEST_CASE ("CPU load per instrument", "[.cpu]")
         for (const auto& play : { Play { "8 keys", 8 }, Play { "24 keys", 24 }, Play { "all keys", 0 }, Play { "all keys, 16 voices", -16 } })
         {
             setParam (plugin, tw::ids::polyphony, float (play.keys < 0 ? tw::polyphonyChoices().indexOf ("16") : 0));
-            REQUIRE (waitForInstrument (plugin, block));
+            REQUIRE (waitForInstrumentAlone (plugin, block));
             // silence first
             for (int b = 0; b < 40; ++b)
             {
@@ -746,4 +822,378 @@ TEST_CASE ("The polyphony choices map to voice limits", "[parameters][polyphony]
     CHECK (tw::polyphonyVoices (tw::polyphonyChoices().size() - 1) == 8);
     PluginProcessor plugin;
     CHECK (plugin.state().getRawParameterValue (tw::ids::polyphony)->load() < 0.5f); // default: every key
+}
+
+TEST_CASE ("The velocity curve bends the middle and keeps the ends", "[velocity]")
+{
+    for (int v = 0; v <= 127; ++v)
+        CHECK (tw::velocityCurve (v, 0.0) == v);
+    for (const double amount : { -1.0, -0.5, 0.3, 1.0 })
+    {
+        CHECK (tw::velocityCurve (0, amount) == 0); // a note-off stays one
+        CHECK (tw::velocityCurve (127, amount) == 127);
+        CHECK (tw::velocityCurve (1, amount) >= 1);
+        for (int v = 2; v <= 127; ++v)
+            CHECK (tw::velocityCurve (v, amount) >= tw::velocityCurve (v - 1, amount));
+    }
+    CHECK (tw::velocityCurve (64, 1.0) == 90);
+    CHECK (tw::velocityCurve (64, -1.0) == 32);
+}
+
+TEST_CASE ("The velocity curve changes how loud a touch plays and presets store it", "[velocity][presets]")
+{
+    PluginProcessor plugin;
+    plugin.setRateAndBufferSizeDetails (48000.0, 512);
+    plugin.prepareToPlay (48000.0, 512);
+    setParam (plugin, tw::ids::humanize, 0.0f);
+    REQUIRE (waitForInstrument (plugin, 512));
+    auto strike = [&] {
+        juce::AudioBuffer<float> buffer (2, 512);
+        double sum = 0.0;
+        for (int b = 0; b < 140; ++b)
+        {
+            juce::MidiBuffer midi;
+            if (b == 0)
+                midi.addEvent (juce::MidiMessage::noteOn (1, 60, (juce::uint8) 50), 0);
+            if (b == 40)
+                midi.addEvent (juce::MidiMessage::noteOff (1, 60), 0);
+            buffer.clear();
+            plugin.processBlock (buffer, midi);
+            if (b < 40)
+                for (int k = 0; k < 512; ++k)
+                    sum += double (buffer.getSample (0, k)) * buffer.getSample (0, k);
+        }
+        return std::sqrt (sum / (40 * 512.0));
+    };
+    const double linear = strike();
+    setParam (plugin, tw::ids::velocityCurve, 100.0f);
+    const double light = strike();
+    setParam (plugin, tw::ids::velocityCurve, -100.0f);
+    const double heavy = strike();
+    WARN ("velocity 50: +100 % " << juce::String (20.0 * std::log10 (light / linear), 1) << " dB, -100 % "
+                                 << juce::String (20.0 * std::log10 (heavy / linear), 1) << " dB");
+    CHECK (light > 1.2 * linear);
+    CHECK (heavy < 0.8 * linear);
+
+    // a preset stores it like every parameter; one without it sets the default
+    auto& presets = plugin.presets();
+    presets.setFolder (juce::File::createTempFile ("tonewerk-presets"));
+    setParam (plugin, tw::ids::velocityCurve, 40.0f);
+    setParam (plugin, tw::ids::transpose, -12.0f);
+    setParam (plugin, tw::ids::tune, -31.8f);
+    REQUIRE (presets.save ("Curve"));
+    REQUIRE (presets.loadFactory (0));
+    CHECK (std::abs (plugin.state().getRawParameterValue (tw::ids::velocityCurve)->load()) < 0.01f);
+    CHECK (std::abs (plugin.state().getRawParameterValue (tw::ids::transpose)->load()) < 0.01f);
+    REQUIRE (presets.loadUser ("Curve"));
+    CHECK (std::abs (plugin.state().getRawParameterValue (tw::ids::velocityCurve)->load() - 40.0f) < 0.01f);
+    CHECK (std::abs (plugin.state().getRawParameterValue (tw::ids::transpose)->load() + 12.0f) < 0.01f);
+    CHECK (std::abs (plugin.state().getRawParameterValue (tw::ids::tune)->load() + 31.8f) < 0.01f);
+}
+
+namespace
+{
+// strikes a key, holds it for 0.6 s and returns the frequency of the tone: the lag of the autocorrelation peak near `expected`
+double pitchOf (PluginProcessor& p, int note, double expected)
+{
+    std::vector<float> x;
+    juce::AudioBuffer<float> buffer (2, 512);
+    for (int b = 0; b < 160; ++b)
+    {
+        juce::MidiBuffer midi;
+        if (b == 0)
+            midi.addEvent (juce::MidiMessage::noteOn (1, note, (juce::uint8) 90), 0);
+        if (b == 56)
+            midi.addEvent (juce::MidiMessage::noteOff (1, note), 0);
+        buffer.clear();
+        p.processBlock (buffer, midi);
+        if (b >= 10 && b < 56) // after the attack
+            x.insert (x.end(), buffer.getReadPointer (0), buffer.getReadPointer (0) + 512);
+    }
+    auto corr = [&] (int lag) {
+        double sum = 0.0;
+        for (size_t i = 0; i + size_t (lag) < x.size(); ++i)
+            sum += double (x[i]) * x[i + size_t (lag)];
+        return sum / double (x.size() - size_t (lag));
+    };
+    const int lo = int (48000.0 / (expected * 1.12)), hi = int (48000.0 / (expected / 1.12)) + 1;
+    int best = lo;
+    for (int lag = lo; lag <= hi; ++lag)
+        if (corr (lag) > corr (best))
+            best = lag;
+    const double a = corr (best - 1), b = corr (best), c = corr (best + 1);
+    const double peak = double (best) + 0.5 * (a - c) / (a - 2.0 * b + c);
+    return 48000.0 / peak;
+}
+} // namespace
+
+TEST_CASE ("Transpose shifts the keys and Tune the pitch", "[audio][tuning]")
+{
+    for (const int i : { 0, instrumentCount() - 1 }) // a physical model (resampled anyway) and a hybrid voice (at the host rate)
+    {
+        PluginProcessor plugin;
+        plugin.setRateAndBufferSizeDetails (48000.0, 512);
+        plugin.prepareToPlay (48000.0, 512);
+        setParam (plugin, tw::ids::humanize, 0.0f);
+        setParam (plugin, tw::ids::instrument, float (i));
+        REQUIRE (waitForInstrumentAlone (plugin, 512));
+        const auto keys = plugin.instrumentKeys();
+
+        const double a4 = pitchOf (plugin, 69, 440.0);
+        CHECK (std::abs (1200.0 * std::log2 (a4 / 440.0)) < 15.0);
+
+        // an octave up: the A below plays the same pitch, and the playable keys move down with it
+        setParam (plugin, tw::ids::transpose, 12.0f);
+        const double shifted = pitchOf (plugin, 57, 440.0);
+        CHECK (std::abs (1200.0 * std::log2 (shifted / a4)) < 3.0);
+        CHECK (plugin.instrumentKeys().first == juce::jmax (0, keys.first - 12));
+        CHECK (plugin.instrumentKeys().second == keys.second - 12);
+        setParam (plugin, tw::ids::transpose, 0.0f);
+
+        for (const float cents : { 50.0f, -100.0f })
+        {
+            setParam (plugin, tw::ids::tune, cents);
+            REQUIRE (waitForInstrumentAlone (plugin, 512));
+            const double tuned = pitchOf (plugin, 69, 440.0);
+            WARN (tw::instrumentId (i) << " tune " << cents << " ct: " << juce::String (1200.0 * std::log2 (tuned / a4), 1) << " ct");
+            CHECK (std::abs (1200.0 * std::log2 (tuned / a4) - double (cents)) < 3.0);
+        }
+    }
+}
+
+TEST_CASE ("A key releases the note it struck when the transposition changes meanwhile", "[audio][tuning]")
+{
+    PluginProcessor plugin;
+    plugin.setRateAndBufferSizeDetails (48000.0, 512);
+    plugin.prepareToPlay (48000.0, 512);
+    REQUIRE (waitForInstrument (plugin, 512));
+    auto run = [&] (juce::MidiBuffer midi, int blocks) {
+        juce::AudioBuffer<float> buffer (2, 512);
+        double sum = 0.0;
+        for (int b = 0; b < blocks; ++b)
+        {
+            buffer.clear();
+            plugin.processBlock (buffer, midi);
+            midi.clear();
+            if (b >= blocks - 10)
+                for (int k = 0; k < 512; ++k)
+                    sum += double (buffer.getSample (0, k)) * buffer.getSample (0, k);
+        }
+        return std::sqrt (sum / 5120.0);
+    };
+    juce::MidiBuffer on, off;
+    on.addEvent (juce::MidiMessage::noteOn (1, 60, (juce::uint8) 100), 0);
+    off.addEvent (juce::MidiMessage::noteOff (1, 60), 0);
+    const double sounding = run (on, 30);
+    REQUIRE (sounding > 1e-4);
+    setParam (plugin, tw::ids::transpose, 5.0f);
+    const double released = run (off, 280); // 3 s: the damper has it
+    CHECK (released < 0.01 * sounding);
+}
+
+TEST_CASE ("The plugin reports one latency and every voice has it", "[audio][latency]")
+{
+    for (const double rate : { 44100.0, 48000.0, 96000.0 })
+    {
+        const int latency = tw::InstrumentVoice::latencyFor (rate);
+        CHECK (latency >= tw::Resampler::kHalfTaps);
+        CHECK (1000.0 * latency / rate < 0.65); // about 0.58 ms at every rate
+
+        PluginProcessor plugin;
+        plugin.setRateAndBufferSizeDetails (rate, 512);
+        plugin.prepareToPlay (rate, 512);
+        CHECK (plugin.getLatencySamples() == latency);
+
+        // own delay + padding = the reported latency, for every instrument and the tuning extremes
+        for (int i = 0; i < instrumentCount(); ++i)
+            for (const float cents : { -100.0f, 0.0f, 100.0f })
+            {
+                tw::VoiceConfig config;
+                config.instrument = i;
+                config.tuneCents = cents;
+                tw::InstrumentVoice voice (config);
+                voice.prepare (rate, 512, latency);
+                INFO (tw::instrumentId (i) << " at " << rate << " Hz, " << cents << " ct: own " << voice.ownLatency() << ", padding "
+                                           << voice.padding());
+                CHECK (voice.ownLatency() <= double (latency));
+                CHECK (std::abs (voice.ownLatency() + voice.padding() - latency) <= 0.5);
+            }
+    }
+
+    // the padding is a plain delay: a hybrid voice (it repeats a strike bit for bit) with and without it
+    tw::VoiceConfig config;
+    config.instrument = instrumentCount() - 1;
+    tw::InstrumentVoice plain (config), padded (config);
+    plain.prepare (48000.0, 512);
+    padded.prepare (48000.0, 512, 28);
+    REQUIRE (padded.padding() == 28);
+    std::vector<float> a (512), b (512), r (512), before;
+    plain.noteOn (60, 100);
+    padded.noteOn (60, 100);
+    double difference = 0.0, level = 0.0;
+    for (int block = 0; block < 20; ++block)
+    {
+        plain.render (a.data(), r.data(), 512);
+        padded.render (b.data(), r.data(), 512);
+        before.insert (before.end(), a.begin(), a.end());
+        for (size_t k = 0; k < 512; ++k)
+        {
+            const size_t at = size_t (block) * 512 + k;
+            const float expected = at >= 28 ? before[at - 28] : 0.0f;
+            difference = std::max (difference, double (std::abs (b[k] - expected)));
+            level = std::max (level, double (std::abs (expected)));
+        }
+    }
+    CHECK (level > 1e-3);
+    CHECK (difference < 1e-6);
+}
+
+TEST_CASE ("The effect chain works on a mono output", "[audio][fx][mono]")
+{
+    PluginProcessor plugin;
+    juce::AudioProcessor::BusesLayout layout;
+    layout.outputBuses.add (juce::AudioChannelSet::mono());
+    REQUIRE (plugin.setBusesLayout (layout));
+    plugin.setRateAndBufferSizeDetails (48000.0, 512);
+    plugin.prepareToPlay (48000.0, 512);
+    setParam (plugin, tw::ids::humanize, 0.0f);
+    REQUIRE (waitForInstrument (plugin, 512));
+
+    // one held note: the RMS of 1.2 s and how much the level of 20 ms windows moves (standard deviation / mean)
+    auto play = [&] {
+        juce::AudioBuffer<float> buffer (1, 512);
+        std::vector<double> windows;
+        double sum = 0.0, window = 0.0;
+        int inWindow = 0;
+        for (int b = 0; b < 300; ++b)
+        {
+            juce::MidiBuffer midi;
+            if (b == 0)
+                midi.addEvent (juce::MidiMessage::noteOn (1, 55, (juce::uint8) 100), 0);
+            if (b == 112)
+                midi.addEvent (juce::MidiMessage::noteOff (1, 55), 0);
+            buffer.clear();
+            plugin.processBlock (buffer, midi);
+            if (b >= 20 && b < 112)
+                for (int k = 0; k < 512; ++k)
+                {
+                    const double x = buffer.getSample (0, k);
+                    REQUIRE (std::isfinite (x));
+                    sum += x * x;
+                    window += x * x;
+                    if (++inWindow == 960)
+                    {
+                        windows.push_back (std::sqrt (window / 960.0));
+                        window = 0.0;
+                        inWindow = 0;
+                    }
+                }
+        }
+        double mean = 0.0, var = 0.0;
+        for (const double w : windows)
+            mean += w / double (windows.size());
+        for (const double w : windows)
+            var += (w - mean) * (w - mean) / double (windows.size());
+        return std::pair { std::sqrt (sum / (92 * 512.0)), std::sqrt (var) / mean };
+    };
+    const auto dry = play();
+    setParam (plugin, tw::ids::fxOn, 1.0f);
+    setParam (plugin, tw::ids::fxDrive, 100.0f);
+    setParam (plugin, tw::ids::panOn, 0.0f);
+    const auto wet = play();
+    CHECK (std::abs (wet.first - dry.first) > 1e-4);
+    CHECK (wet.first < 1.0);
+
+    // the Vari-Pan moves the sound between two channels: what is left of it in their sum
+    setParam (plugin, tw::ids::panOn, 1.0f);
+    setParam (plugin, tw::ids::panDepth, 100.0f);
+    setParam (plugin, tw::ids::panRate, 5.0f);
+    const auto panned = play();
+    WARN ("mono: level movement dry " << juce::String (dry.second, 3) << ", effects " << juce::String (wet.second, 3)
+                                       << ", with the Vari-Pan " << juce::String (panned.second, 3) << "; level with / without the pan "
+                                       << juce::String (20.0 * std::log10 (panned.first / wet.first), 1) << " dB");
+    CHECK (panned.first < 1.0);
+}
+
+TEST_CASE ("Every control explains itself in its tooltip", "[parameters][editor]")
+{
+    for (const auto family : { tw::engines::Family::Tines, tw::engines::Family::Reeds, tw::engines::Family::Hybrid })
+        for (const auto& id : tw::allParameterIds())
+        {
+            INFO (id);
+            const auto help = tw::parameterHelp (id, family);
+            CHECK (help.length() > 15);
+            CHECK (help.endsWithChar ('.'));
+        }
+    CHECK (tw::parameterHelp ("no_such_parameter", tw::engines::Family::Tines).isEmpty());
+
+    // the editor shows it: name, explanation and the learned CC
+    PluginProcessor plugin;
+    plugin.midiLearn().assign (21, tw::ids::reverbMix); // before the editor: it hears later changes on the message loop
+    auto* editor = plugin.createEditorAndMakeActive();
+    {
+        int explained = 0;
+        bool sawCc = false;
+        std::function<void (juce::Component&)> visit = [&] (juce::Component& c) {
+            if (auto* t = dynamic_cast<juce::SettableTooltipClient*> (&c))
+            {
+                const auto tip = t->getTooltip();
+                explained += tip.contains (": ") ? 1 : 0;
+                sawCc = sawCc || (tip.startsWith ("Reverb Mix: ") && tip.endsWith ("(CC 21)"));
+            }
+            for (auto* child : c.getChildren())
+                visit (*child);
+        };
+        visit (*editor);
+        CHECK (explained >= tw::allParameterIds().size());
+        CHECK (sawCc);
+    }
+    plugin.editorBeingDeleted (editor);
+    delete editor;
+}
+
+// the level of every factory preset (hidden: ./Tests "[.presetlevels]"): a four-note chord at velocity 100 and at 127, the
+// output peak and the most the limiter took away
+TEST_CASE ("Factory preset levels", "[.presetlevels]")
+{
+    PluginProcessor plugin;
+    plugin.setRateAndBufferSizeDetails (48000.0, 512);
+    plugin.prepareToPlay (48000.0, 512);
+    const auto names = plugin.presets().factoryNames();
+    for (int i = 0; i < names.size(); ++i)
+    {
+        juce::String line = names[i].paddedRight (' ', 26);
+        for (const int velocity : { 100, 127 })
+        {
+            REQUIRE (plugin.presets().loadFactory (i));
+            setParam (plugin, tw::ids::humanize, 0.0f);
+            REQUIRE (waitForInstrumentAlone (plugin, 512));
+            juce::AudioBuffer<float> buffer (2, 512);
+            for (int b = 0; b < 100; ++b) // the tail of the chord before
+            {
+                juce::MidiBuffer none;
+                plugin.processBlock (buffer, none);
+            }
+            plugin.takeOutputLevel();
+            double sum = 0.0;
+            for (int b = 0; b < 190; ++b)
+            {
+                juce::MidiBuffer midi;
+                if (b == 0)
+                    for (const int note : { 48, 55, 60, 64 })
+                        midi.addEvent (juce::MidiMessage::noteOn (1, note, (juce::uint8) velocity), 0);
+                if (b == 140)
+                    midi.addEvent (juce::MidiMessage::allNotesOff (1), 0);
+                buffer.clear();
+                plugin.processBlock (buffer, midi);
+                if (b < 140)
+                    sum += double (buffer.getRMSLevel (0, 0, 512)) * buffer.getRMSLevel (0, 0, 512);
+            }
+            const auto level = plugin.takeOutputLevel();
+            line << "  v" << velocity << ": rms " << juce::String (10.0 * std::log10 (sum / 140.0 + 1e-12), 1) << " dB, peak "
+                 << juce::String (juce::Decibels::gainToDecibels (std::max (level.left, level.right)), 1) << " dB, limiter "
+                 << juce::String (juce::Decibels::gainToDecibels (level.limiterGain), 1) << " dB";
+        }
+        WARN (line);
+    }
 }

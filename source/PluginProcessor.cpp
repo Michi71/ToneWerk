@@ -4,6 +4,7 @@
 
 #include "Parameters.h"
 #include "PluginEditor.h"
+#include "VelocityCurve.h"
 
 #include <core/dsp.h>
 
@@ -36,6 +37,10 @@ PluginProcessor::PluginProcessor()
     damperRelease_ = raw (ids::damperRelease);
     humanizeAmount_ = raw (ids::humanize);
     polyphony_ = raw (ids::polyphony);
+    velocityCurve_ = raw (ids::velocityCurve);
+    transpose_ = raw (ids::transpose);
+    tune_ = raw (ids::tune);
+    keyMap_.fill (-1);
     fxp_ = { raw (ids::fxOn), raw (ids::fxVolume), raw (ids::fxDrive), raw (ids::fxEnvelope), raw (ids::fxBass), raw (ids::fxMid),
         raw (ids::fxMidFreq), raw (ids::fxTreble), raw (ids::panOn), raw (ids::panWave), raw (ids::panRate), raw (ids::panDepth),
         raw (ids::compOn), raw (ids::compAmount), raw (ids::compMakeup), raw (ids::chorusOn), raw (ids::chorusRate),
@@ -72,6 +77,7 @@ tw::VoiceConfig PluginProcessor::wantedConfig() const
     tw::VoiceConfig c;
     c.instrument = int (std::lround (instrument_->load()));
     c.maxVoices = tw::polyphonyVoices (int (std::lround (polyphony_->load())));
+    c.tuneCents = tune_->load();
     auto& v = c.voicing;
     v.hardness = hardness_->load();
     v.decay = decay_->load();
@@ -89,7 +95,7 @@ tw::VoiceConfig PluginProcessor::wantedConfig() const
 
 static int64_t signatureOf (const tw::VoiceConfig& c)
 {
-    auto h = int64_t (c.instrument) * 1000003 + int64_t (c.maxVoices) * 7919;
+    auto h = int64_t (c.instrument) * 1000003 + int64_t (c.maxVoices) * 7919 + int64_t (std::lround (c.tuneCents * 10.0f)) * 104729;
     for (float v : c.voicingValues())
         h = h * 31 + int64_t (std::lround (v * 100.0f));
     return h;
@@ -100,7 +106,8 @@ int64_t PluginProcessor::wantedSignature() const { return signatureOf (wantedCon
 void PluginProcessor::build (const tw::VoiceConfig& config)
 {
     auto voice = std::make_unique<tw::InstrumentVoice> (config);
-    voice->prepare (hostRate_.load(), kChunk);
+    const double rate = hostRate_.load();
+    voice->prepare (rate, kChunk, tw::InstrumentVoice::latencyFor (rate));
     {
         const juce::ScopedLock sl (statusLock_);
         status_ = voice->status();
@@ -140,6 +147,12 @@ void PluginProcessor::run()
     }
 }
 
+std::pair<int, int> PluginProcessor::instrumentKeys() const
+{
+    const int shift = int (std::lround (transpose_->load()));
+    return { juce::jlimit (0, 127, keyLo_.load() - shift), juce::jlimit (0, 127, keyHi_.load() - shift) };
+}
+
 juce::String PluginProcessor::instrumentStatus() const
 {
     const juce::ScopedLock sl (statusLock_);
@@ -151,6 +164,8 @@ juce::String PluginProcessor::instrumentStatus() const
 void PluginProcessor::prepareToPlay (double sampleRate, int)
 {
     hostRate_.store (sampleRate);
+    // the same for every instrument and tuning (InstrumentVoice::latencyFor): the host need not be told again on a switch
+    setLatencySamples (tw::InstrumentVoice::latencyFor (sampleRate));
     fx_.setDelayTime (4.0);
     fx_.init (sampleRate);
     fxGain_ = 0.0f;
@@ -162,8 +177,12 @@ void PluginProcessor::prepareToPlay (double sampleRate, int)
     gain_.setCurrentAndTargetValue (juce::Decibels::decibelsToGain (volume_->load(), -48.0f));
     fadeStep_ = float (1.0 / (kFadeMs * 1e-3 * sampleRate));
     fading_.reset(); // not real time here
+    setRinging (false);
+    ringKeys_.reset();
+    ringQuietFrames_ = int64_t (kRingQuietS * sampleRate);
+    ringMaxFrames_ = int64_t (kRingMaxS * sampleRate);
     if (active_ && !juce::exactlyEqual (active_->hostRate(), sampleRate))
-        active_->prepare (sampleRate, kChunk);
+        active_->prepare (sampleRate, kChunk, tw::InstrumentVoice::latencyFor (sampleRate));
     if (auto* p = pending_.load(); p != nullptr && !juce::exactlyEqual (p->hostRate(), sampleRate))
         rebuild_.store (true); // adoptPending() refuses it, the loader builds one for this rate
 }
@@ -183,10 +202,23 @@ void PluginProcessor::retire (std::unique_ptr<tw::InstrumentVoice>& voice)
         voice.release();
 }
 
+void PluginProcessor::setRinging (bool ringing)
+{
+    ringing_ = ringing;
+    ringingFlag_.store (ringing, std::memory_order_relaxed);
+}
+
 void PluginProcessor::adoptPending()
 {
-    if (fading_ != nullptr || pending_.load() == nullptr)
-        return; // one switch at a time: the previous fade is still running or not collected yet
+    if (pending_.load() == nullptr)
+        return;
+    if (fading_ != nullptr)
+    {
+        // one switch at a time: the previous fade is still running or not collected yet. A voice that rings out makes way
+        // for the next one (two voices at most): it fades now and the pending one is adopted when it is gone.
+        setRinging (false);
+        return;
+    }
     std::unique_ptr<tw::InstrumentVoice> next (pending_.exchange (nullptr));
     if (next == nullptr)
         return;
@@ -199,8 +231,13 @@ void PluginProcessor::adoptPending()
         return;
     }
     next->controller (64, sustain_);
+    // the same instrument with another voicing (or voice limit): what sounds keeps sounding. Another instrument fades out.
+    const bool ring = active_ != nullptr && active_->config().instrument == next->config().instrument && active_->activeKeys() > 0;
     fading_ = std::move (active_);
     fadeGain_ = 1.0f;
+    setRinging (ring);
+    ringKeys_ = ring ? held_ : std::bitset<128>();
+    ringFrames_ = ringQuiet_ = 0;
     active_ = std::move (next);
     readyGeneration_.store (signatureOf (active_->config()));
 }
@@ -219,16 +256,65 @@ void PluginProcessor::handleMidi (const juce::MidiMessage& m)
         pendingProgram_.store (m.getProgramChangeNumber());
         return;
     }
-    if (active_ == nullptr)
-        return;
+    // the ringing voice gets no new strikes: only the releases of its own keys, the pedal and the other controllers
+    auto* ringing = ringing_ ? fading_.get() : nullptr;
+    // a MIDI key plays the instrument's key a transposition away; its note-off releases that one, whatever the control says by then
+    size_t key = 0;
+    if (m.isNoteOn() || m.isNoteOff())
+    {
+        auto& mapped = keyMap_[size_t (m.getNoteNumber() & 127)];
+        if (m.isNoteOn())
+        {
+            const int k = m.getNoteNumber() + int (std::lround (transpose_->load()));
+            mapped = int8_t (k >= 0 && k <= 127 ? k : -1);
+        }
+        const int k = mapped;
+        if (m.isNoteOff())
+            mapped = -1;
+        if (k < 0)
+            return; // transposed off the MIDI range, or a release without a strike
+        key = size_t (k);
+    }
+    auto releaseRinging = [&] {
+        if (ringing == nullptr || !ringKeys_.test (key))
+            return false;
+        ringKeys_.reset (key);
+        ringing->noteOff (int (key));
+        return true;
+    };
     if (m.isNoteOn())
-        active_->noteOn (m.getNoteNumber(), humanize_.apply (m.getVelocity(), double (humanizeAmount_->load()) * 0.01));
+    {
+        held_.set (key);
+        releaseRinging(); // a second note-on without a note-off in between
+        if (active_ != nullptr)
+        {
+            const int velocity = tw::velocityCurve (m.getVelocity(), double (velocityCurve_->load()) * 0.01);
+            active_->noteOn (int (key), humanize_.apply (velocity, double (humanizeAmount_->load()) * 0.01));
+        }
+    }
     else if (m.isNoteOff())
-        active_->noteOff (m.getNoteNumber());
+    {
+        held_.reset (key);
+        if (!releaseRinging() && active_ != nullptr)
+            active_->noteOff (int (key));
+    }
     else if (m.isAllNotesOff())
-        active_->allNotesOff();
+    {
+        held_.reset();
+        ringKeys_.reset();
+        keyMap_.fill (-1);
+        if (ringing != nullptr)
+            ringing->allNotesOff();
+        if (active_ != nullptr)
+            active_->allNotesOff();
+    }
     else if (m.isController())
-        active_->controller (m.getControllerNumber(), m.getControllerValue());
+    {
+        if (ringing != nullptr)
+            ringing->controller (m.getControllerNumber(), m.getControllerValue());
+        if (active_ != nullptr)
+            active_->controller (m.getControllerNumber(), m.getControllerValue());
+    }
 }
 
 void PluginProcessor::renderSegment (float* left, float* right, int n)
@@ -245,6 +331,22 @@ void PluginProcessor::renderSegment (float* left, float* right, int n)
     float* fl = scratch_.getWritePointer (0);
     float* fr = scratch_.getWritePointer (1);
     fading_->render (fl, fr, n);
+    if (ringing_)
+    {
+        float peak = 0.0f;
+        for (int i = 0; i < n; ++i)
+        {
+            left[i] += fl[i];
+            right[i] += fr[i];
+            peak = juce::jmax (peak, std::abs (fl[i]), std::abs (fr[i]));
+        }
+        ringFrames_ += n;
+        ringQuiet_ = peak < kRingFloor ? ringQuiet_ + n : 0;
+        // rung out: no key sounds any more, or what is left is inaudible. The short fade below ends it without a step.
+        if (fading_->activeKeys() == 0 || ringQuiet_ >= ringQuietFrames_ || ringFrames_ >= ringMaxFrames_)
+            setRinging (false);
+        return;
+    }
     for (int i = 0; i < n; ++i)
     {
         left[i] += fadeGain_ * fl[i];
@@ -312,10 +414,11 @@ void PluginProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::Midi
     for (; it != midi.end(); ++it)
         handleMidi ((*it).getMessage());
 
-    // the MK8 effect chain (stereo only), then the reverb on its own switch (the grands want it without the MK8 preamp), both at
+    // the MK8 effect chain, then the reverb on its own switch (the grands want it without the MK8 preamp), both at
     // the host rate. A switch cross-fades the stage in or out over kSwitchMs: the hard switch clicked (measured: the largest
     // step 4.7 times the chord's own when the chain came in)
-    const bool fxOn = fxp_.on->load() > 0.5f && !mono;
+    // (a mono output: both run in stereo on a scratch channel and are folded down below)
+    const bool fxOn = fxp_.on->load() > 0.5f;
     const bool reverbOn = rvp_.on->load() > 0.5f;
     if (fxOn || fxGain_ > 0.0f)
         updateEffects();
@@ -378,14 +481,29 @@ void PluginProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::Midi
             right[i] *= g;
     }
     limiter_.process (left, mono ? nullptr : right, n);
+    float peakLeft = 0.0f, peakRight = 0.0f;
     for (int i = 0; i < n; ++i)
     {
         left[i] = pmp::softClip (left[i]);
+        peakLeft = juce::jmax (peakLeft, std::abs (left[i]));
         if (!mono)
+        {
             right[i] = pmp::softClip (right[i]);
+            peakRight = juce::jmax (peakRight, std::abs (right[i]));
+        }
     }
+    // for the meter: the extremes since the editor last took them (it may take them between the load and the store here:
+    // then one block's peak shows a moment longer, nothing else)
+    meterLeft_.store (juce::jmax (meterLeft_.load (std::memory_order_relaxed), peakLeft), std::memory_order_relaxed);
+    meterRight_.store (juce::jmax (meterRight_.load (std::memory_order_relaxed), mono ? peakLeft : peakRight), std::memory_order_relaxed);
+    meterLimiter_.store (juce::jmin (meterLimiter_.load (std::memory_order_relaxed), limiter_.takeMinGain()), std::memory_order_relaxed);
     for (int ch = 2; ch < buffer.getNumChannels(); ++ch)
         buffer.clear (ch, 0, n);
+}
+
+PluginProcessor::OutputLevel PluginProcessor::takeOutputLevel()
+{
+    return { meterLeft_.exchange (0.0f), meterRight_.exchange (0.0f), meterLimiter_.exchange (1.0f) };
 }
 
 // --- message thread: MIDI that changes the plugin --------------------------------------------------------------------------

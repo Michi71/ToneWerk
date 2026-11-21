@@ -66,6 +66,11 @@ namespace ids
     inline constexpr const char* humanize = "humanize";
     // polyphony limit for slower computers: over it a new key makes the quietest voice fade out (a rebuild of the instrument)
     inline constexpr const char* polyphony = "polyphony";
+    // fits the plugin to the keyboard: bends the velocity of every note-on (VelocityCurve.h)
+    inline constexpr const char* velocityCurve = "velocity_curve";
+    // the keys shifted by semitones, and the pitch of the whole instrument in cents (a rebuild of the instrument)
+    inline constexpr const char* transpose = "transpose";
+    inline constexpr const char* tune = "tune";
 } // namespace ids
 
 // The instruments: presets of the three sound engines. The index is the value of the instrument parameter (saved in projects
@@ -93,6 +98,9 @@ const juce::StringArray& voicingIds (engines::Family family);
 const juce::StringArray& allVoicingIds();
 // the short name of a voicing control on the panel of a family
 juce::String voicingLabel (const juce::String& id, engines::Family family);
+
+// what a control does, one sentence for its tooltip (the voicing controls per family); empty for an unknown ID
+juce::String parameterHelp (const juce::String& id, engines::Family family);
 
 juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout();
 

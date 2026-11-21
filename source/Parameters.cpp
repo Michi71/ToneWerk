@@ -106,6 +106,76 @@ juce::String voicingLabel (const juce::String& id, Family family)
     return id;
 }
 
+juce::String parameterHelp (const juce::String& id, Family family)
+{
+    const bool tines = family == Family::Tines, hybrid = family == Family::Hybrid;
+    struct Help
+    {
+        const char* id;
+        const char* text;
+    };
+    const Help help[] = {
+        { ids::instrument, "The instrument. A switch builds it in the background; the previous one fades out." },
+        { ids::volume, "Output level after the effects. A limiter and a soft clip follow: watch the meter." },
+        { ids::humanize, "Strike variation: every note-on's velocity scatters a little, so no two strikes are the same." },
+        { ids::velocityCurve, "Bends the velocity: positive values make a light touch play louder, negative ones softer." },
+        { ids::polyphony, "The most keys that sound at once, for slower computers. Over the limit the quietest voice fades out." },
+        { ids::transpose, "Shifts the keys by semitones." },
+        { ids::tune, "The pitch of the whole instrument in cents, to a band's or a recording's reference." },
+        { ids::hardness, hybrid ? "Hammer hardness: the timbre of a harder or softer strike (32 velocity steps per 100 %)."
+                                : "Hardness of the hammer tip or felt: +100 % halves the contact time, a brighter attack." },
+        { ids::hammerMass, "Hammer weight (the Pianet: how firmly the pad sticks): heavier strikes longer and darker." },
+        { ids::strikePoint, tines ? "Where the hammer meets the tine: changes which overtones the strike excites."
+                                  : "Where the hammer or pad meets the reed: changes which overtones the strike excites." },
+        { ids::gauge, tines ? "Tine diameter (the tine is re-tuned): thicker rings longer and purer."
+                            : "Reed thickness (the reed is re-tuned): thicker rings longer and purer." },
+        { ids::pickupGap, "Width of the pickup's field: narrower is brighter with more bite, wider is softer." },
+        { ids::pickupOffset, "Moves the pickup off the rest position (the bark): more offset, more even overtones. CC1 moves it live." },
+        { ids::tonebarDetune, "Tuning of the tonebar against the tine, in cents." },
+        { ids::damperRelease, "How long a note rings on after the key is released." },
+        { ids::decay, "Decay time of every mode: +100 % doubles it." },
+        { ids::unison, "Spread of the strings of one note: more beating and shimmer." },
+        { ids::stretch, "Stretch tuning about C4, in cents per octave." },
+        { ids::fxOn, "The whole MK8 effect chain on or off (the reverb has its own switch)." },
+        { ids::fxDrive, "Preamp drive: diode saturation, from clean to growl." },
+        { ids::fxEnvelope, "Touch wah: the harder you play, the further the filter opens." },
+        { ids::fxVolume, "Preamp level into the effects that follow." },
+        { ids::fxBass, "Bass shelf, -15 to +15 dB." },
+        { ids::fxMid, "Mid band, -15 to +15 dB, at the frequency of Mid Freq." },
+        { ids::fxMidFreq, "Centre frequency of the mid band." },
+        { ids::fxTreble, "Treble shelf, -15 to +15 dB." },
+        { ids::panOn, "Vari-Pan on or off: moves the sound between left and right (a tremolo on a mono output)." },
+        { ids::panWave, "Shape of the Vari-Pan's movement." },
+        { ids::panRate, "Speed of the Vari-Pan." },
+        { ids::panDepth, "How far the Vari-Pan moves the sound to the sides." },
+        { ids::compOn, "Compressor on or off." },
+        { ids::compAmount, "How strongly the compressor evens out loud and soft strikes." },
+        { ids::compMakeup, "Gain after the compressor, to make up for the level it takes away." },
+        { ids::chorusOn, "Chorus on or off." },
+        { ids::chorusRate, "Speed of the chorus." },
+        { ids::chorusDepth, "Depth of the chorus: how far its delay moves, in milliseconds." },
+        { ids::phaserOn, "Phaser on or off." },
+        { ids::phaserRate, "Speed of the phaser's sweep." },
+        { ids::phaserDepth, "Depth of the phaser's sweep." },
+        { ids::delayOn, "Delay on or off." },
+        { ids::delayTime, "Time between the echoes." },
+        { ids::delayFeedback, "How much of each echo feeds the next: more feedback, more repeats." },
+        { ids::delayMix, "Level of the echoes against the direct sound." },
+        { ids::delayPingPong, "The echoes alternate between left and right." },
+        { ids::reverbOn, "Reverb on or off, independent of the FX switch." },
+        { ids::reverbMix, "Level of the reverb against the direct sound." },
+        { ids::reverbSize, "Size of the room." },
+        { ids::reverbDecay, "Reverberation time (RT60), 0.3 to 10 s." },
+        { ids::reverbDamping, "How fast the high frequencies die away in the room." },
+        { ids::reverbPredelay, "Time before the reverb sets in: keeps the attack clear." },
+        { ids::reverbWidth, "Stereo width of the reverb." },
+    };
+    for (const auto& h : help)
+        if (id == h.id)
+            return juce::String::fromUTF8 (h.text);
+    return {};
+}
+
 namespace
 {
     using Layout = juce::AudioProcessorValueTreeState::ParameterLayout;
@@ -227,6 +297,13 @@ Layout createParameterLayout()
         polyphonyChoices(), 0));
     layout.add (std::move (engine));
 
+    // how the instrument answers the player: the velocity curve, transpose, tune (presets store them like every parameter)
+    auto player = std::make_unique<juce::AudioProcessorParameterGroup> ("player", "Player", "|");
+    player->addChild (number (ids::velocityCurve, "Velocity Curve", { -100.0f, 100.0f, 1.0f }, 0.0f, "%", 0));
+    player->addChild (number (ids::transpose, "Transpose", { -12.0f, 12.0f, 1.0f }, 0.0f, "st", 0));
+    player->addChild (number (ids::tune, "Tune", { -100.0f, 100.0f, 0.1f }, 0.0f, "ct", 1));
+    layout.add (std::move (player));
+
     return layout;
 }
 
@@ -241,7 +318,8 @@ const juce::StringArray& allParameterIds()
         ids::reverbOn, ids::reverbMix, ids::reverbSize, ids::reverbDecay, ids::reverbDamping, ids::reverbPredelay, ids::reverbWidth,
         ids::humanize,
         ids::hammerMass, ids::strikePoint, ids::gauge, ids::pickupGap, ids::pickupOffset, ids::tonebarDetune, ids::damperRelease,
-        ids::polyphony
+        ids::polyphony,
+        ids::velocityCurve, ids::transpose, ids::tune
     };
     return all;
 }

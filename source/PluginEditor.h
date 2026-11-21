@@ -20,6 +20,8 @@ namespace learnui
     juce::PopupMenu menu (MidiLearn& learn, const juce::String& parameterId);
     void showMenu (MidiLearn& learn, const juce::String& parameterId, juce::Component& target);
     juce::String tooltip (const juce::String& base, int cc, bool learning);
+    // "Name: what the control does" (tw::parameterHelp), the base of a control's tooltip
+    juce::String describe (const juce::String& name, const juce::String& parameterId, engines::Family family);
     // compact: a dot instead of the tag (the switches)
     void paintHint (juce::Graphics& g, juce::Rectangle<int> bounds, int cc, bool learning, bool compact);
     MidiLearn* of (juce::AudioProcessorValueTreeState& state); // the processor's
@@ -36,6 +38,13 @@ public:
     {
         if (learn_ != nullptr)
             learn_->removeChangeListener (this);
+    }
+
+    // the text before the MIDI hint (the control's name and what it does)
+    void setTooltipText (const juce::String& tooltip)
+    {
+        tooltip_ = tooltip;
+        refresh();
     }
 
     void attachMidiLearn (MidiLearn* learn, const juce::String& parameterId, const juce::String& tooltip)
@@ -101,13 +110,15 @@ class Knob : public juce::Component
 {
 public:
     Knob (juce::AudioProcessorValueTreeState& state, const juce::String& id, const juce::String& name);
-    void setTitle (const juce::String& name) { label_.setText (name, juce::dontSendNotification); }
+    // the name on the panel and the tooltip, for the family whose instrument is loaded
+    void setTitle (const juce::String& name, engines::Family family);
     void resized() override;
     Learnable<juce::Slider>& slider() { return slider_; }
 
 private:
     Learnable<juce::Slider> slider_;
     juce::Label label_;
+    juce::String id_, parameterName_;
     juce::AudioProcessorValueTreeState::SliderAttachment attachment_;
 };
 
@@ -156,6 +167,7 @@ private:
     juce::TextButton prevPreset_ { "<" }, nextPreset_ { ">" }, savePreset_, deletePreset_;
     juce::ComboBox presetBox_;
     std::vector<tw::PresetManager::Entry> presetEntries_;
+    std::unique_ptr<juce::Component> transpose_, tune_; // the player's settings, left of the presets
     juce::String shownPreset_;
     bool shownFactory_ = false;
 
@@ -163,8 +175,8 @@ private:
     tw::Learnable<juce::ComboBox> instrumentBox_;
     std::unique_ptr<juce::AudioProcessorValueTreeState::ComboBoxAttachment> instrumentAttachment_;
     juce::Label status_;
-    std::unique_ptr<tw::Knob> volume_, humanize_;
-    std::unique_ptr<juce::Component> polyphony_;
+    std::unique_ptr<tw::Knob> volume_, humanize_, velocityCurve_;
+    std::unique_ptr<juce::Component> polyphony_, meter_;
     std::map<juce::String, std::unique_ptr<tw::Knob>> voicing_; // every voicing control; the family's are shown
     juce::StringArray shownVoicing_;
     int shownFamily_ = -1;
