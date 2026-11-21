@@ -45,7 +45,9 @@ jobs:
             pluginval-binary: pluginval.app/Contents/MacOS/pluginval
             extra-flags: -G Ninja -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64"
           - name: Windows
-            os: windows-latest
+            # not windows-latest: that image (VS 2026) got an STL that wants Clang 22 while its LLVM is 20 (STL1000);
+            # VS 2022's STL takes the Clang of this image. Back to windows-latest once its LLVM has caught up.
+            os: windows-2022
             pluginval-binary: ./pluginval.exe
             extra-flags: -G Ninja -DCMAKE_C_COMPILER=clang-cl -DCMAKE_CXX_COMPILER=clang-cl
 
