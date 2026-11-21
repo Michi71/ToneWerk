@@ -417,6 +417,7 @@ mech2.gain=432.6
 mech3.hz=591.2
 mech3.t60=0.01069
 mech3.gain=427.3
+mech.gainByKey=87:0,88:-11.3,89:-8.8,90:-8.7,91:-4.1,92:-2.5,93:0
 hammer.speedHardening=25
 tine.lossHf2=1.6e-5
 tine.lossHf2ByKey=28:2e-4,41:2e-4,43:4e-5,49:4e-5,52:1e-06,72:1e-06,76:4e-06   # mode 2 gone below F#2 (36-37), 0.2-0.3 s at G#2-C#3 like the V8 set (35), the middle bell 0.3-0.8 s
