@@ -1197,3 +1197,47 @@ TEST_CASE ("Factory preset levels", "[.presetlevels]")
         WARN (line);
     }
 }
+
+// The hybrid engine counts a key as sounding only once its computed modes have taken over from the sampled attack (0.25 s
+// after the strike): a voicing change right after a strike must let that note ring out all the same
+TEST_CASE ("A note struck just before a voicing change rings out", "[audio][voicing]")
+{
+    for (const int i : { 0, tw::instrumentIndex ("clavinet"), instrumentCount() - 1 })
+    {
+        PluginProcessor plugin;
+        plugin.setRateAndBufferSizeDetails (48000.0, 512);
+        plugin.prepareToPlay (48000.0, 512);
+        setParam (plugin, tw::ids::instrument, float (i));
+        REQUIRE (waitForInstrument (plugin, 512));
+
+        // one strike, then hardly any audio while the loader builds the voice with the new voicing (it works by the clock,
+        // not by the audio): the voices change at most 0.2 s of audio after the strike
+        setParam (plugin, tw::ids::hardness, 50.0f);
+        juce::AudioBuffer<float> buffer (2, 512);
+        juce::MidiBuffer strike;
+        strike.addEvent (juce::MidiMessage::noteOn (1, 48, (juce::uint8) 100), 0);
+        plugin.processBlock (buffer, strike);
+        for (int b = 0; b < 18 && !plugin.instrumentReady(); ++b)
+        {
+            juce::Thread::sleep (b == 0 ? 600 : 250);
+            juce::MidiBuffer none;
+            plugin.processBlock (buffer, none);
+        }
+        REQUIRE (plugin.instrumentReady());
+        INFO (tw::instrumentId (i));
+        CHECK (plugin.ringingOut());
+
+        // the key stays down: 0.3 s later the note still sounds in the old voice
+        double sum = 0.0;
+        for (int b = 0; b < 28; ++b)
+        {
+            juce::MidiBuffer none;
+            buffer.clear();
+            plugin.processBlock (buffer, none);
+            if (b >= 19)
+                sum += double (buffer.getRMSLevel (0, 0, 512)) * buffer.getRMSLevel (0, 0, 512);
+        }
+        CHECK (plugin.ringingOut());
+        CHECK (std::sqrt (sum / 9.0) > 1e-4);
+    }
+}
