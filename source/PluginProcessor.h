@@ -93,6 +93,9 @@ private:
     static constexpr float kRingFloor = 1.0e-5f;  // the ringing voice counts as quiet below this peak (-100 dB)
     static constexpr double kRingQuietS = 0.5;    // ... for this long: it has rung out
     static constexpr double kRingMaxS = 60.0;     // the longest ring-out
+    // A voice's count of sounding keys is not trusted this long after a strike: the hybrid engine counts a key only once
+    // its computed modes have taken over from the sampled attack (0.25 s)
+    static constexpr double kRingAttackS = 0.5;
     static constexpr double kSwitchMs = 20.0; // cross-fade of the FX and reverb switches
 
     void run() override; // the loader thread
@@ -161,6 +164,10 @@ private:
     std::bitset<128> held_;     // the instrument's keys down now
     std::bitset<128> ringKeys_; // keys struck on the ringing voice and still down: their note-off belongs to it
     int64_t ringFrames_ = 0, ringQuiet_ = 0, ringQuietFrames_ = 24000, ringMaxFrames_ = 2880000;
+    static constexpr int64_t kLongAgo = int64_t (1) << 40;
+    int64_t sinceStrike_ = kLongAgo;     // frames since the last note-on into the active voice
+    int64_t ringSinceStrike_ = kLongAgo; // ... into the ringing voice
+    int64_t ringAttackFrames_ = 24000;
     int sustain_ = 0;
     pmp::Mk8Effects fx_;
     tw::Reverb reverb_;
