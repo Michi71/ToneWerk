@@ -20,6 +20,8 @@ namespace learnui
     juce::PopupMenu menu (MidiLearn& learn, const juce::String& parameterId);
     void showMenu (MidiLearn& learn, const juce::String& parameterId, juce::Component& target);
     juce::String tooltip (const juce::String& base, int cc, bool learning);
+    // "Name: what the control does" (tw::parameterHelp), the base of a control's tooltip
+    juce::String describe (const juce::String& name, const juce::String& parameterId, engines::Family family);
     // compact: a dot instead of the tag (the switches)
     void paintHint (juce::Graphics& g, juce::Rectangle<int> bounds, int cc, bool learning, bool compact);
     MidiLearn* of (juce::AudioProcessorValueTreeState& state); // the processor's
@@ -36,6 +38,13 @@ public:
     {
         if (learn_ != nullptr)
             learn_->removeChangeListener (this);
+    }
+
+    // the text before the MIDI hint (the control's name and what it does)
+    void setTooltipText (const juce::String& tooltip)
+    {
+        tooltip_ = tooltip;
+        refresh();
     }
 
     void attachMidiLearn (MidiLearn* learn, const juce::String& parameterId, const juce::String& tooltip)
@@ -101,13 +110,15 @@ class Knob : public juce::Component
 {
 public:
     Knob (juce::AudioProcessorValueTreeState& state, const juce::String& id, const juce::String& name);
-    void setTitle (const juce::String& name) { label_.setText (name, juce::dontSendNotification); }
+    // the name on the panel and the tooltip, for the family whose instrument is loaded
+    void setTitle (const juce::String& name, engines::Family family);
     void resized() override;
     Learnable<juce::Slider>& slider() { return slider_; }
 
 private:
     Learnable<juce::Slider> slider_;
     juce::Label label_;
+    juce::String id_, parameterName_;
     juce::AudioProcessorValueTreeState::SliderAttachment attachment_;
 };
 

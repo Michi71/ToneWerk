@@ -1112,3 +1112,40 @@ TEST_CASE ("The effect chain works on a mono output", "[audio][fx][mono]")
                                        << juce::String (20.0 * std::log10 (panned.first / wet.first), 1) << " dB");
     CHECK (panned.first < 1.0);
 }
+
+TEST_CASE ("Every control explains itself in its tooltip", "[parameters][editor]")
+{
+    for (const auto family : { tw::engines::Family::Tines, tw::engines::Family::Reeds, tw::engines::Family::Hybrid })
+        for (const auto& id : tw::allParameterIds())
+        {
+            INFO (id);
+            const auto help = tw::parameterHelp (id, family);
+            CHECK (help.length() > 15);
+            CHECK (help.endsWithChar ('.'));
+        }
+    CHECK (tw::parameterHelp ("no_such_parameter", tw::engines::Family::Tines).isEmpty());
+
+    // the editor shows it: name, explanation and the learned CC
+    PluginProcessor plugin;
+    plugin.midiLearn().assign (21, tw::ids::reverbMix); // before the editor: it hears later changes on the message loop
+    auto* editor = plugin.createEditorAndMakeActive();
+    {
+        int explained = 0;
+        bool sawCc = false;
+        std::function<void (juce::Component&)> visit = [&] (juce::Component& c) {
+            if (auto* t = dynamic_cast<juce::SettableTooltipClient*> (&c))
+            {
+                const auto tip = t->getTooltip();
+                explained += tip.contains (": ") ? 1 : 0;
+                sawCc = sawCc || (tip.startsWith ("Reverb Mix: ") && tip.endsWith ("(CC 21)"));
+            }
+            for (auto* child : c.getChildren())
+                visit (*child);
+        };
+        visit (*editor);
+        CHECK (explained >= tw::allParameterIds().size());
+        CHECK (sawCc);
+    }
+    plugin.editorBeingDeleted (editor);
+    delete editor;
+}

@@ -23,7 +23,7 @@ public:
         addAndMakeVisible (label_);
         if (auto* p = dynamic_cast<juce::AudioParameterChoice*> (state.getParameter (id)))
             box_.addItemList (p->choices, 1);
-        box_.attachMidiLearn (tw::learnui::of (state), id, name);
+        box_.attachMidiLearn (tw::learnui::of (state), id, tw::learnui::describe (name, id, tw::engines::Family::Tines));
         addAndMakeVisible (box_);
         attachment_ = std::make_unique<juce::AudioProcessorValueTreeState::ComboBoxAttachment> (state, id, box_);
     }
@@ -149,7 +149,7 @@ public:
         label_.setJustificationType (juce::Justification::centred);
         label_.setFont (juce::FontOptions (12.5f));
         addAndMakeVisible (label_);
-        button_.attachMidiLearn (tw::learnui::of (state), id, name);
+        button_.attachMidiLearn (tw::learnui::of (state), id, tw::learnui::describe (name, id, tw::engines::Family::Tines));
         addAndMakeVisible (button_);
         attachment_ = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment> (state, id, button_);
     }
@@ -204,6 +204,12 @@ namespace learnui
         m.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&target).withMousePosition());
     }
 
+    String describe (const String& name, const String& parameterId, engines::Family family)
+    {
+        const auto help = tw::parameterHelp (parameterId, family);
+        return help.isEmpty() ? name : name + ": " + help;
+    }
+
     String tooltip (const String& base, int cc, bool learning)
     {
         if (learning)
@@ -239,7 +245,7 @@ namespace learnui
 } // namespace learnui
 
 Knob::Knob (juce::AudioProcessorValueTreeState& state, const String& id, const String& name)
-    : attachment_ (state, id, slider_)
+    : id_ (id), attachment_ (state, id, slider_)
 {
     slider_.setSliderStyle (juce::Slider::RotaryHorizontalVerticalDrag);
     // set here: the text box is created before the knob has a parent with the plugin's look
@@ -253,13 +259,20 @@ Knob::Knob (juce::AudioProcessorValueTreeState& state, const String& id, const S
         slider_.setDoubleClickReturnValue (true, double (p->convertFrom0to1 (p->getDefaultValue())));
         slider_.textFromValueFunction = [p] (double v) { return p->getText (p->convertTo0to1 (float (v)), 16); };
         slider_.updateText();
-        slider_.attachMidiLearn (learnui::of (state), id, p->getName (64));
+        parameterName_ = p->getName (64);
+        slider_.attachMidiLearn (learnui::of (state), id, learnui::describe (parameterName_, id, engines::Family::Tines));
     }
     label_.setText (name, juce::dontSendNotification);
     label_.setJustificationType (juce::Justification::centred);
     label_.setFont (juce::FontOptions (12.5f));
     addAndMakeVisible (slider_);
     addAndMakeVisible (label_);
+}
+
+void Knob::setTitle (const String& name, engines::Family family)
+{
+    label_.setText (name, juce::dontSendNotification);
+    slider_.setTooltipText (learnui::describe (parameterName_, id_, family));
 }
 
 void Knob::resized()
@@ -274,7 +287,7 @@ Section::Section (const String& title, juce::AudioProcessorValueTreeState& state
     if (switchId != nullptr)
     {
         switch_ = std::make_unique<Learnable<juce::ToggleButton>>();
-        switch_->attachMidiLearn (learnui::of (state), switchId, title + " on/off");
+        switch_->attachMidiLearn (learnui::of (state), switchId, learnui::describe (title + " on/off", switchId, engines::Family::Tines));
         addAndMakeVisible (*switch_);
         switchAttachment_ = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment> (state, switchId, *switch_);
     }
@@ -355,7 +368,8 @@ PluginEditor::PluginEditor (PluginProcessor& p)
 
     // instrument
     instrumentBox_.addItemList (tw::instrumentNames(), 1);
-    instrumentBox_.attachMidiLearn (&p.midiLearn(), ids::instrument, "Instrument");
+    instrumentBox_.attachMidiLearn (&p.midiLearn(), ids::instrument,
+        tw::learnui::describe ("Instrument", ids::instrument, tw::engines::Family::Tines));
     addAndMakeVisible (instrumentBox_);
     instrumentAttachment_ = std::make_unique<juce::AudioProcessorValueTreeState::ComboBoxAttachment> (state, ids::instrument,
         instrumentBox_);
@@ -370,8 +384,9 @@ PluginEditor::PluginEditor (PluginProcessor& p)
     polyphony_ = std::make_unique<ChoiceBox> (state, ids::polyphony, "Voices");
     meter_ = std::make_unique<LevelMeter> (p);
     addAndMakeVisible (*meter_);
-    transpose_ = std::make_unique<NumberBar> (state, ids::transpose, "Transpose", "Transpose: shifts the keys by semitones");
-    tune_ = std::make_unique<NumberBar> (state, ids::tune, "Tune", "Tune: the pitch of the whole instrument in cents");
+    transpose_ = std::make_unique<NumberBar> (state, ids::transpose, "Transpose",
+        tw::learnui::describe ("Transpose", ids::transpose, tw::engines::Family::Tines));
+    tune_ = std::make_unique<NumberBar> (state, ids::tune, "Tune", tw::learnui::describe ("Tune", ids::tune, tw::engines::Family::Tines));
     addAndMakeVisible (*transpose_);
     addAndMakeVisible (*tune_);
     addAndMakeVisible (*polyphony_);
@@ -389,7 +404,7 @@ PluginEditor::PluginEditor (PluginProcessor& p)
 
     // effects
     fxOn_.setButtonText ("FX");
-    fxOn_.attachMidiLearn (&p.midiLearn(), ids::fxOn, "Effect chain on/off");
+    fxOn_.attachMidiLearn (&p.midiLearn(), ids::fxOn, tw::learnui::describe ("Effect chain on/off", ids::fxOn, tw::engines::Family::Tines));
     addAndMakeVisible (fxOn_);
     fxOnAttachment_ = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment> (state, ids::fxOn, fxOn_);
     auto knob = [&state] (const char* id, const char* name) { return std::make_unique<tw::Knob> (state, id, utf8 (name)); };
@@ -595,7 +610,7 @@ void PluginEditor::showInstrument()
     for (auto& [id, knob] : voicing_)
     {
         knob->setVisible (shownVoicing_.contains (id));
-        knob->setTitle (tw::voicingLabel (id, family));
+        knob->setTitle (tw::voicingLabel (id, family), family);
     }
     if (keys.first <= keys.second)
         keyboard_.setAvailableRange (keys.first, keys.second);

@@ -99,6 +99,9 @@ const juce::StringArray& allVoicingIds();
 // the short name of a voicing control on the panel of a family
 juce::String voicingLabel (const juce::String& id, engines::Family family);
 
+// what a control does, one sentence for its tooltip (the voicing controls per family); empty for an unknown ID
+juce::String parameterHelp (const juce::String& id, engines::Family family);
+
 juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout();
 
 // a setting of the player's keyboard or band, not of a sound: presets neither store nor change it (the velocity curve,
