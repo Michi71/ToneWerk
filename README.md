@@ -62,6 +62,10 @@ compiled into it. The engines render mono; the effect chain and the reverb make 
   strikes scatters by about 1 dB. Applies to every instrument; the physical models are built without their own speed scatter
   (they keep the scatter of the felt, `human.contact`). At 0 % the hybrid voices repeat a strike bit for bit (at the bank's
   rate).
+- **Velocity** (−100 … +100 %, default 0 %): fits the plugin to the keyboard. A power curve bends the velocity of every
+  note-on before the strike variation: positive values make a light touch play louder (velocity 64 plays as 90 at +100 %),
+  negative ones make it softer (64 plays as 32 at −100 %); the softest and the hardest strike stay where they are. It
+  belongs to the keyboard, not to a sound: presets neither store nor change it (a project saves it).
 - **Voices** (polyphony): *All* (default) or a limit of 64 … 8 keys for slower computers. Over the limit a new key makes the
   quietest voice fade out in 20–30 ms without a click (a released key before a held one). Changing it rebuilds the instrument.
   Measured on an Apple M4 Max at 48 kHz with the effect chain and the reverb on, every key held with the pedal costs 4–9 % of

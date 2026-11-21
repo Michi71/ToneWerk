@@ -102,7 +102,7 @@ bool PresetManager::exists (const juce::String& name) const { return fileFor (na
 void PresetManager::resetToDefaults()
 {
     for (auto* p : state_.processor.getParameters())
-        if (auto* r = dynamic_cast<juce::RangedAudioParameter*> (p))
+        if (auto* r = dynamic_cast<juce::RangedAudioParameter*> (p); r != nullptr && !isPlayerSetting (r->getParameterID()))
             r->setValueNotifyingHost (r->getDefaultValue());
 }
 
@@ -137,7 +137,7 @@ bool PresetManager::loadUser (const juce::String& name)
     for (const auto& id : allParameterIds())
     {
         const auto child = tree.getChildWithProperty ("id", id);
-        if (child.isValid() && child.hasProperty ("value"))
+        if (child.isValid() && child.hasProperty ("value") && !isPlayerSetting (id))
             setParameter (state_, id, float (child.getProperty ("value")));
     }
     // a preset saved with MIDI assignments brings them along; one without keeps the current ones
@@ -162,6 +162,9 @@ bool PresetManager::save (const juce::String& name)
     if (clean.isEmpty() || !folder_.createDirectory())
         return false;
     auto tree = state_.copyState();
+    for (int i = tree.getNumChildren(); --i >= 0;)
+        if (isPlayerSetting (tree.getChild (i).getProperty ("id").toString()))
+            tree.removeChild (i, nullptr); // the keyboard's, not the sound's
     tree.setProperty (kNameProperty, clean, nullptr);
     tree.removeProperty (kFactoryProperty, nullptr);
     const auto xml = tree.createXml();

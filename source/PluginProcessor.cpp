@@ -4,6 +4,7 @@
 
 #include "Parameters.h"
 #include "PluginEditor.h"
+#include "VelocityCurve.h"
 
 #include <core/dsp.h>
 
@@ -36,6 +37,7 @@ PluginProcessor::PluginProcessor()
     damperRelease_ = raw (ids::damperRelease);
     humanizeAmount_ = raw (ids::humanize);
     polyphony_ = raw (ids::polyphony);
+    velocityCurve_ = raw (ids::velocityCurve);
     fxp_ = { raw (ids::fxOn), raw (ids::fxVolume), raw (ids::fxDrive), raw (ids::fxEnvelope), raw (ids::fxBass), raw (ids::fxMid),
         raw (ids::fxMidFreq), raw (ids::fxTreble), raw (ids::panOn), raw (ids::panWave), raw (ids::panRate), raw (ids::panDepth),
         raw (ids::compOn), raw (ids::compAmount), raw (ids::compMakeup), raw (ids::chorusOn), raw (ids::chorusRate),
@@ -256,7 +258,10 @@ void PluginProcessor::handleMidi (const juce::MidiMessage& m)
         held_.set (key);
         releaseRinging(); // a second note-on without a note-off in between
         if (active_ != nullptr)
-            active_->noteOn (int (key), humanize_.apply (m.getVelocity(), double (humanizeAmount_->load()) * 0.01));
+        {
+            const int velocity = tw::velocityCurve (m.getVelocity(), double (velocityCurve_->load()) * 0.01);
+            active_->noteOn (int (key), humanize_.apply (velocity, double (humanizeAmount_->load()) * 0.01));
+        }
     }
     else if (m.isNoteOff())
     {

@@ -7,6 +7,7 @@
 #include <PluginEditor.h>
 #include <PluginProcessor.h>
 #include <PresetManager.h>
+#include <VelocityCurve.h>
 
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_string.hpp>
@@ -821,4 +822,69 @@ TEST_CASE ("The polyphony choices map to voice limits", "[parameters][polyphony]
     CHECK (tw::polyphonyVoices (tw::polyphonyChoices().size() - 1) == 8);
     PluginProcessor plugin;
     CHECK (plugin.state().getRawParameterValue (tw::ids::polyphony)->load() < 0.5f); // default: every key
+}
+
+TEST_CASE ("The velocity curve bends the middle and keeps the ends", "[velocity]")
+{
+    for (int v = 0; v <= 127; ++v)
+        CHECK (tw::velocityCurve (v, 0.0) == v);
+    for (const double amount : { -1.0, -0.5, 0.3, 1.0 })
+    {
+        CHECK (tw::velocityCurve (0, amount) == 0); // a note-off stays one
+        CHECK (tw::velocityCurve (127, amount) == 127);
+        CHECK (tw::velocityCurve (1, amount) >= 1);
+        for (int v = 2; v <= 127; ++v)
+            CHECK (tw::velocityCurve (v, amount) >= tw::velocityCurve (v - 1, amount));
+    }
+    CHECK (tw::velocityCurve (64, 1.0) == 90);
+    CHECK (tw::velocityCurve (64, -1.0) == 32);
+}
+
+TEST_CASE ("The velocity curve changes how loud a touch plays and survives presets", "[velocity][presets]")
+{
+    PluginProcessor plugin;
+    plugin.setRateAndBufferSizeDetails (48000.0, 512);
+    plugin.prepareToPlay (48000.0, 512);
+    setParam (plugin, tw::ids::humanize, 0.0f);
+    REQUIRE (waitForInstrument (plugin, 512));
+    auto strike = [&] {
+        juce::AudioBuffer<float> buffer (2, 512);
+        double sum = 0.0;
+        for (int b = 0; b < 140; ++b)
+        {
+            juce::MidiBuffer midi;
+            if (b == 0)
+                midi.addEvent (juce::MidiMessage::noteOn (1, 60, (juce::uint8) 50), 0);
+            if (b == 40)
+                midi.addEvent (juce::MidiMessage::noteOff (1, 60), 0);
+            buffer.clear();
+            plugin.processBlock (buffer, midi);
+            if (b < 40)
+                for (int k = 0; k < 512; ++k)
+                    sum += double (buffer.getSample (0, k)) * buffer.getSample (0, k);
+        }
+        return std::sqrt (sum / (40 * 512.0));
+    };
+    const double linear = strike();
+    setParam (plugin, tw::ids::velocityCurve, 100.0f);
+    const double light = strike();
+    setParam (plugin, tw::ids::velocityCurve, -100.0f);
+    const double heavy = strike();
+    WARN ("velocity 50: +100 % " << juce::String (20.0 * std::log10 (light / linear), 1) << " dB, -100 % "
+                                 << juce::String (20.0 * std::log10 (heavy / linear), 1) << " dB");
+    CHECK (light > 1.2 * linear);
+    CHECK (heavy < 0.8 * linear);
+
+    // it belongs to the keyboard, not to a sound: presets leave it where it is
+    auto& presets = plugin.presets();
+    const auto dir = juce::File::createTempFile ("tonewerk-presets");
+    presets.setFolder (dir);
+    setParam (plugin, tw::ids::velocityCurve, 40.0f);
+    REQUIRE (presets.save ("Curve"));
+    CHECK_FALSE (dir.getChildFile ("Curve.twpreset").loadFileAsString().contains (tw::ids::velocityCurve));
+    setParam (plugin, tw::ids::velocityCurve, -25.0f);
+    REQUIRE (presets.loadFactory (1));
+    CHECK (std::abs (plugin.state().getRawParameterValue (tw::ids::velocityCurve)->load() + 25.0f) < 0.01f);
+    REQUIRE (presets.loadUser ("Curve"));
+    CHECK (std::abs (plugin.state().getRawParameterValue (tw::ids::velocityCurve)->load() + 25.0f) < 0.01f);
 }

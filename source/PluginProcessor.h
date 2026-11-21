@@ -117,6 +117,7 @@ private:
                        *pickupOffset_ = nullptr, *tonebarDetune_ = nullptr, *damperRelease_ = nullptr;
     std::atomic<float>* humanizeAmount_ = nullptr;
     std::atomic<float>* polyphony_ = nullptr;
+    std::atomic<float>* velocityCurve_ = nullptr;
     struct FxParams
     {
         std::atomic<float>*on, *volume, *drive, *envelope, *bass, *mid, *midFreq, *treble, *panOn, *panWave, *panRate, *panDepth,

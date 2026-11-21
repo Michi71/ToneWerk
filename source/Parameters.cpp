@@ -227,8 +227,15 @@ Layout createParameterLayout()
         polyphonyChoices(), 0));
     layout.add (std::move (engine));
 
+    // the player's keyboard, not the sound: presets leave it alone (isPlayerSetting)
+    auto player = std::make_unique<juce::AudioProcessorParameterGroup> ("player", "Player", "|");
+    player->addChild (number (ids::velocityCurve, "Velocity Curve", { -100.0f, 100.0f, 1.0f }, 0.0f, "%", 0));
+    layout.add (std::move (player));
+
     return layout;
 }
+
+bool isPlayerSetting (const juce::String& id) { return id == ids::velocityCurve; }
 
 const juce::StringArray& allParameterIds()
 {
@@ -241,7 +248,8 @@ const juce::StringArray& allParameterIds()
         ids::reverbOn, ids::reverbMix, ids::reverbSize, ids::reverbDecay, ids::reverbDamping, ids::reverbPredelay, ids::reverbWidth,
         ids::humanize,
         ids::hammerMass, ids::strikePoint, ids::gauge, ids::pickupGap, ids::pickupOffset, ids::tonebarDetune, ids::damperRelease,
-        ids::polyphony
+        ids::polyphony,
+        ids::velocityCurve
     };
     return all;
 }
