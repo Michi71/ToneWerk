@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // SPDX-FileCopyrightText: 2026 Michi71
 #include <Limiter.h>
+#include <Parameters.h>
+#include <PluginProcessor.h>
 
 #include <catch2/catch_test_macros.hpp>
 #include <core/dsp.h>
@@ -56,4 +58,58 @@ TEST_CASE ("The limiter keeps a loud sine clean and passes a quiet one bit for b
         else
             CHECK (snrLim > snrClip + 30.0);
     }
+}
+
+TEST_CASE ("The output level reports the peak and the limiter", "[limiter][meter]")
+{
+    PluginProcessor plugin;
+    plugin.setRateAndBufferSizeDetails (48000.0, 512);
+    plugin.prepareToPlay (48000.0, 512);
+    juce::AudioBuffer<float> buffer (2, 512);
+    auto run = [&] (juce::MidiBuffer midi, int blocks) {
+        float peak = 0.0f;
+        for (int b = 0; b < blocks; ++b)
+        {
+            buffer.clear();
+            plugin.processBlock (buffer, midi);
+            midi.clear();
+            peak = std::max (peak, buffer.getMagnitude (0, 512));
+        }
+        return peak;
+    };
+    for (int i = 0; i < 6000 && !plugin.instrumentReady(); ++i)
+    {
+        run ({}, 1);
+        juce::Thread::sleep (5);
+    }
+    REQUIRE (plugin.instrumentReady());
+    plugin.takeOutputLevel();
+
+    // silence: nothing to show
+    run ({}, 10);
+    auto level = plugin.takeOutputLevel();
+    CHECK (level.left < 1e-4f);
+    CHECK (juce::exactlyEqual (level.limiterGain, 1.0f));
+
+    // one soft note: the peak of the output, the limiter idle
+    juce::MidiBuffer soft;
+    soft.addEvent (juce::MidiMessage::noteOn (1, 60, (juce::uint8) 40), 0);
+    const float peak = run (soft, 20);
+    level = plugin.takeOutputLevel();
+    CHECK (juce::exactlyEqual (level.left, peak));
+    CHECK (level.right > 0.0f);
+    CHECK (juce::exactlyEqual (level.limiterGain, 1.0f));
+    CHECK (plugin.takeOutputLevel().left <= peak); // taken: the next reading starts anew
+
+    // a loud chord at +12 dB: the limiter holds it back
+    auto* volume = dynamic_cast<juce::RangedAudioParameter*> (plugin.state().getParameter (tw::ids::volume));
+    REQUIRE (volume != nullptr);
+    volume->setValueNotifyingHost (1.0f);
+    juce::MidiBuffer loud;
+    for (const int note : { 36, 43, 48, 52, 55, 60, 64, 67 })
+        loud.addEvent (juce::MidiMessage::noteOn (1, note, (juce::uint8) 127), 0);
+    run (loud, 40);
+    level = plugin.takeOutputLevel();
+    CHECK (level.limiterGain < 0.95f);
+    CHECK (level.left <= 1.0f);
 }

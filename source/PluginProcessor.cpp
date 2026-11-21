@@ -477,14 +477,29 @@ void PluginProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::Midi
             right[i] *= g;
     }
     limiter_.process (left, mono ? nullptr : right, n);
+    float peakLeft = 0.0f, peakRight = 0.0f;
     for (int i = 0; i < n; ++i)
     {
         left[i] = pmp::softClip (left[i]);
+        peakLeft = juce::jmax (peakLeft, std::abs (left[i]));
         if (!mono)
+        {
             right[i] = pmp::softClip (right[i]);
+            peakRight = juce::jmax (peakRight, std::abs (right[i]));
+        }
     }
+    // for the meter: the extremes since the editor last took them (it may take them between the load and the store here:
+    // then one block's peak shows a moment longer, nothing else)
+    meterLeft_.store (juce::jmax (meterLeft_.load (std::memory_order_relaxed), peakLeft), std::memory_order_relaxed);
+    meterRight_.store (juce::jmax (meterRight_.load (std::memory_order_relaxed), mono ? peakLeft : peakRight), std::memory_order_relaxed);
+    meterLimiter_.store (juce::jmin (meterLimiter_.load (std::memory_order_relaxed), limiter_.takeMinGain()), std::memory_order_relaxed);
     for (int ch = 2; ch < buffer.getNumChannels(); ++ch)
         buffer.clear (ch, 0, n);
+}
+
+PluginProcessor::OutputLevel PluginProcessor::takeOutputLevel()
+{
+    return { meterLeft_.exchange (0.0f), meterRight_.exchange (0.0f), meterLimiter_.exchange (1.0f) };
 }
 
 // --- message thread: MIDI that changes the plugin --------------------------------------------------------------------------

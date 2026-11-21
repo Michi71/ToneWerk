@@ -30,6 +30,7 @@ void Limiter::process (float* left, float* right, int n)
         }
         if (gain_ < 1.0f)
         {
+            minGain_ = std::min (minGain_, gain_);
             left[i] *= gain_;
             if (right != nullptr)
                 right[i] *= gain_;

@@ -73,6 +73,13 @@ public:
     juce::String instrumentStatus() const;
     // the keys the loaded instrument plays (MIDI notes); any thread
     std::pair<int, int> instrumentKeys() const; // as played: shifted by the transposition
+    // the output since the last call, for a meter: the peak of each channel after the soft clip (a mono output: both the
+    // same) and the lowest gain of the limiter (1: it held nothing back). One reader; message thread.
+    struct OutputLevel
+    {
+        float left = 0.0f, right = 0.0f, limiterGain = 1.0f;
+    };
+    OutputLevel takeOutputLevel();
     // the strike variation's random sequence, for repeatable tests
     void seedHumanize (uint64_t seed) { humanize_.seed (seed); }
     // true when the voice built for the current parameters plays (tests; the audio thread adopts it in processBlock)
@@ -137,6 +144,7 @@ private:
     std::atomic<double> hostRate_ { 48000.0 };
     std::atomic<bool> rebuild_ { false };
     std::atomic<int64_t> readyGeneration_ { -1 };
+    std::atomic<float> meterLeft_ { 0.0f }, meterRight_ { 0.0f }, meterLimiter_ { 1.0f }; // audio -> message thread
 
     // loader thread only (read under the lock or atomically)
     mutable juce::CriticalSection statusLock_;

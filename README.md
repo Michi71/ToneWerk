@@ -56,6 +56,9 @@ compiled into it. The engines render mono; the effect chain and the reverb make 
 - **Volume** (−48 … +12 dB) after the effect chain, followed by a peak limiter (attack 0.1 ms, release 120 ms, no lookahead)
   and the soft clip as the last safeguard: full chords are turned down instead of distorted. Per-instrument trims level the
   instruments at C4 velocity 100 (`instruments()` in `source/Parameters.cpp`, measured with `./Builds/Tests "[.levels]"`).
+- **Level meter** (under the instrument's name): the output peak of each channel after the limiter and the soft clip, from
+  −48 to 0 dBFS. The mark is the limiter's threshold (−1.4 dBFS); **LIM** lights while the limiter holds a peak back:
+  then Volume, or the preset's level, is higher than the output can carry cleanly.
 - **Humanize** (0–100 %, default 50 %): every strike scatters a little, so no two notes are bit for bit the same. The velocity
   is multiplied by a random factor exp(σ g); 50 % is the physical presets' hammer-speed scatter (`human.speed` 0.05) carried
   over to the velocity (σ 0.038 of ln velocity), 100 % twice that. Level and timbre move: at 100 % the level of repeated

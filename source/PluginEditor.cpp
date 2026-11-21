@@ -75,6 +75,70 @@ private:
     std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> attachment_;
 };
 
+// the output level: a bar per channel from -48 to 0 dBFS (peak, falling back slowly) and a light for the limiter
+class LevelMeter : public juce::Component, public juce::SettableTooltipClient, private juce::Timer
+{
+public:
+    explicit LevelMeter (PluginProcessor& p) : processor_ (p)
+    {
+        setTooltip ("Output level, -48 to 0 dBFS. The mark is the limiter's threshold; LIM lights while it holds a peak back.");
+        startTimerHz (30);
+    }
+    void paint (juce::Graphics& g) override
+    {
+        using namespace tw::colours;
+        auto r = getLocalBounds().toFloat();
+        auto light = r.removeFromRight (30.0f);
+        r.removeFromRight (4.0f);
+        const float mark = r.getX() + r.getWidth() * position (tw::Limiter::kThreshold);
+        const float barHeight = juce::jmax (2.0f, (r.getHeight() - 2.0f) * 0.5f);
+        for (int ch = 0; ch < 2; ++ch)
+        {
+            const auto bar = r.withHeight (barHeight).withY (r.getY() + float (ch) * (barHeight + 2.0f));
+            g.setColour (knob);
+            g.fillRoundedRectangle (bar, 1.5f);
+            const float end = bar.getX() + bar.getWidth() * position (level_[ch]);
+            g.setColour (accent.withAlpha (0.85f));
+            g.fillRoundedRectangle (bar.withRight (juce::jmin (end, mark)), 1.5f);
+            if (end > mark)
+            {
+                g.setColour (hot_);
+                g.fillRect (bar.withLeft (mark).withRight (end));
+            }
+        }
+        g.setColour (dim);
+        g.fillRect (mark, r.getY(), 1.0f, r.getHeight());
+        g.setColour (limiting_ > 0 ? hot_ : dim.withAlpha (0.5f));
+        g.setFont (juce::FontOptions (10.0f, juce::Font::bold));
+        g.drawText ("LIM", light, juce::Justification::centred);
+    }
+
+private:
+    static float position (float gain) // 0..1 along the bar
+    {
+        return juce::jlimit (0.0f, 1.0f, 1.0f + juce::Decibels::gainToDecibels (gain, -48.0f) / 48.0f);
+    }
+    void timerCallback() override
+    {
+        const auto now = processor_.takeOutputLevel();
+        const float fall = 0.89f; // -1 dB a frame: 30 dB/s
+        const float before[] { level_[0], level_[1] };
+        level_[0] = juce::jmax (now.left, level_[0] * fall);
+        level_[1] = juce::jmax (now.right, level_[1] * fall);
+        const int was = limiting_;
+        limiting_ = now.limiterGain < 0.999f ? 9 : juce::jmax (0, limiting_ - 1); // stays lit for 0.3 s
+        const bool moved = std::abs (position (level_[0]) - position (before[0])) > 1e-4f
+                           || std::abs (position (level_[1]) - position (before[1])) > 1e-4f;
+        if (moved || (was > 0) != (limiting_ > 0))
+            repaint();
+    }
+
+    PluginProcessor& processor_;
+    float level_[2] { 0.0f, 0.0f };
+    int limiting_ = 0;
+    const juce::Colour hot_ { 0xffe0523a };
+};
+
 // a bool parameter as a labelled switch, centred in its cell
 class Switch : public juce::Component
 {
@@ -304,6 +368,8 @@ PluginEditor::PluginEditor (PluginProcessor& p)
     humanize_ = std::make_unique<tw::Knob> (state, ids::humanize, "Humanize");
     velocityCurve_ = std::make_unique<tw::Knob> (state, ids::velocityCurve, "Velocity");
     polyphony_ = std::make_unique<ChoiceBox> (state, ids::polyphony, "Voices");
+    meter_ = std::make_unique<LevelMeter> (p);
+    addAndMakeVisible (*meter_);
     transpose_ = std::make_unique<NumberBar> (state, ids::transpose, "Transpose", "Transpose: shifts the keys by semitones");
     tune_ = std::make_unique<NumberBar> (state, ids::tune, "Tune", "Tune: the pitch of the whole instrument in cents");
     addAndMakeVisible (*transpose_);
@@ -467,7 +533,9 @@ void PluginEditor::resized()
     ip.removeFromTop (36);
     instrumentBox_.setBounds (ip.removeFromTop (34));
     ip.removeFromTop (6);
-    status_.setBounds (ip.removeFromTop (36));
+    auto statusRow = ip.removeFromTop (36);
+    status_.setBounds (statusRow.removeFromTop (20));
+    meter_->setBounds (statusRow.withTrimmedTop (3).withTrimmedBottom (3).reduced (2, 0));
     ip.removeFromBottom (10);
     auto vol = ip.removeFromTop (juce::jmin (130, ip.getHeight() / 3));
     const int quarter = vol.getWidth() / 4;
