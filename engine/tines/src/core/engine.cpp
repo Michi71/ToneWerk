@@ -519,11 +519,20 @@ void Engine::noteOn(int note, int velocity) {
     const int v = std::min(velocity, 127);
     double db = params_.velGainDb.n > 0 ? double(params_.velGainDb(float(v))) : 0.0;
     if (params_.velGainSlope.n > 0) db += double(params_.velGainSlope(float(note))) * (v - 127);
-    const double level = db != 0.0 ? std::pow(10.0, db / 20.0) : 1.0;
+    double level = db != 0.0 ? std::pow(10.0, db / 20.0) : 1.0;
     if (params_.damperVelDb.n > 0)
         voices_[k].setDamperScale(std::pow(10.0,
             double(params_.damperVelDb(float(v))) / 20.0));
     double speed = hammerVelocity(velocity), contact = 1.0;
+    if (params_.velSpeedExpByKey.n > 0) {            // a flatter speed curve at this key, the level made up
+        const double g = double(params_.velSpeedExpByKey(float(note)));
+        const double pivot = double(params_.velSpeedExpPivot);
+        if (g > 0.0 && g != 1.0 && pivot > 0.0 && speed > 0.0) {
+            const double flat = pivot * std::pow(speed / pivot, g);
+            level *= std::pow(speed / flat, double(params_.velSpeedExpMakeup));
+            speed = flat;
+        }
+    }
     if (params_.velSpeedCapByKey.n > 0) {
         const double cap = double(params_.velSpeedCapByKey(float(note)));
         if (cap > 0.0) speed /= std::pow(1.0 + std::pow(speed / cap, 4.0), 0.25);
