@@ -193,6 +193,7 @@ KeyConfig Engine::makeKeyConfig(int note) const {
     }
     // the upper tonebar mode (docs/ATTACK_WINDOWS.md 5): a second detuned resonator above f1, struck with
     // the tine and dead within the attack; the short-lived lines of the recordings in 0-20 ms
+    // (ratio 1.0: a fast-decaying share of the fundamental, section 55)
     const double upDb = p.tonebarUpperDbByKey.n ? double(p.tonebarUpperDbByKey(key)) : double(p.tonebarUpperDb);
     const double upExp = p.tonebarUpperVelExpByKey.n ? double(p.tonebarUpperVelExpByKey(key))
                           : double(p.tonebarUpperVelExp);
@@ -202,11 +203,14 @@ KeyConfig Engine::makeKeyConfig(int note) const {
         const double ratio = p.tonebarUpperRatioByKey.n ? double(p.tonebarUpperRatioByKey(key))
                               : (p.tonebarUpperRatio > 0.0f ? double(p.tonebarUpperRatio)
                                  : 1.53 * std::pow(f1 / 329.6276, -0.14));
-        const double fU = f1 * std::min(std::max(ratio, 1.10), 1.60);
+        const double fU = f1 * std::min(std::max(ratio, 1.0), 1.60);
         const double level = dbToGain(upDb);
-        const double fast = std::min(std::max(double(p.tonebarUpperFastShare), 0.0), 1.0);
+        const double fast = std::min(std::max(p.tonebarUpperFastShareByKey.n ? double(p.tonebarUpperFastShareByKey(key))
+                                                                              : double(p.tonebarUpperFastShare), 0.0), 1.0);
         const double share[2] = {fast, 1.0 - fast};
-        const double t60[2] = {double(p.tonebarUpperT60), double(p.tonebarUpperSlowT60)};
+        const double t60[2] = {double(p.tonebarUpperT60), p.tonebarUpperSlowT60ByKey.n
+                                                           ? double(p.tonebarUpperSlowT60ByKey(key))
+                                                           : double(p.tonebarUpperSlowT60)};
         for (int q = 0; q < 2; ++q) {
             if (share[q] <= 0.0) continue;
             const int k = c.modes.count++;

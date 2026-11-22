@@ -102,7 +102,7 @@ struct Params {
     // the tine, struck with it and dead within the attack (T60 of the fast part, a weak slow rest). It is
     // the candidate for the short-lived lines the model lacks in 0-20 ms; off by default until measured.
     float tonebarUpperDb   = -120.0f;  // [dB] level at the pickup relative to H1 (<= -60: off)
-    float tonebarUpperRatio = 0.0f;    // f/f1 (0: auto 1.49 at E4 .. 1.17 at A#6)
+    float tonebarUpperRatio = 0.0f;    // f/f1, 1.0..1.6 (0: auto 1.49 at E4 .. 1.17 at A#6)
     float tonebarUpperT60  = 0.03f;    // [s] fast part
     float tonebarUpperSlowT60 = 0.20f; // [s] slow rest
     float tonebarUpperFastShare = 0.85f; // share of the fast part (0..1)
@@ -110,6 +110,11 @@ struct Params {
     Curve tonebarUpperRatioByKey;      // f/f1 per key (empty: auto from the key)
     float tonebarUpperVelExp = 0.0f;   // extra velocity exponent of the upper mode's strike input
     Curve tonebarUpperVelExpByKey;     // per key (empty: tonebar.upperVelExp)
+    // Per key, the upper mode can also be a fast-decaying share of the fundamental itself (ratio 1.0): in the
+    // treble the recordings start a hard strike 9-14 dB above the ring and fall back within 150 ms, at f1 and
+    // with no line beside it (docs/ATTACK_WINDOWS.md 55). That needs its own decay there.
+    Curve tonebarUpperSlowT60ByKey;    // [s] slow rest per key (empty: tonebar.upperSlowT60)
+    Curve tonebarUpperFastShareByKey;  // share of the fast part per key, 0..1 (empty: tonebar.upperFastShare)
     // The click of the recordings decays 1-2.6 dB/ms after the strike (T60 25-50 ms) and stands 30-46 dB over the
     // ring, the model's mode 2 decays like the bell (docs/ATTACK_WINDOWS.md 28): mode 2 splits like the tonebar,
     // a copy at its frequency with the share s of its amplitude at the pickup decays with fastT60, the bell keeps
