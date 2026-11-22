@@ -160,6 +160,13 @@ struct Params {
     // per key: soft limit of the hammer speed [m/s], v / (1 + (v/cap)^4)^(1/4): a heavy hammer does not reach
     // the speed the action gives a light one (mark8 bass, docs/ATTACK_WINDOWS.md 37); empty or 0: none
     Curve velSpeedCapByKey;
+    // The hammer speed over the velocity can be flatter at single keys: speed' = pivot (speed / pivot)^exp
+    // (docs/ATTACK_WINDOWS.md 60). In the bass of mark2 the spectrum grew more steeply with the velocity than
+    // in the recordings. The strike's level is made up with (speed / speed')^makeup, so the loudness over the
+    // velocity stays; the cap acts after it.
+    Curve velSpeedExpByKey;            // exponent per key (empty: 1)
+    float velSpeedExpPivot = 1.0f;     // [m/s] the speed that stays
+    float velSpeedExpMakeup = 0.8f;    // exponent of the level make-up (0: none)
 
     // --- electromagnetic pickup ---------------------------------------------------------
     Curve pickupWidth;                 // [mm] field width w (~ gap + pole size)
