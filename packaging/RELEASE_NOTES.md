@@ -1,45 +1,48 @@
-Playing and fitting: voicing changes no longer cut notes off, the plugin adapts to your keyboard and your band's pitch, and there are fifteen more presets.
+Even keyboards: single keys that struck harder, rang shorter or sounded thinner than the keys beside them are evened out, in every instrument family.
 
-![ToneWerk](https://github.com/Michi71/ToneWerk/raw/v0.3.0/docs/images/tonewerk.png)
+![ToneWerk](https://github.com/Michi71/ToneWerk/raw/v0.3.1/docs/images/tonewerk.png)
 
 ▶ [Watch the video](https://youtu.be/U0xUk3iMI5s): the first fourteen factory presets one after the other, three minutes (recorded with 0.2.1).
 
 ## What is new
 
-- **Voicing without a cut:** turning a voicing control (or changing **Voices**) no longer stops what sounds. The notes ring
-  out with the voicing they were struck with, pedal and key releases included, while every new strike plays the new one.
-- **Velocity:** a new control next to Humanize bends the velocity curve (−100 … +100 %), to fit the plugin to your keyboard:
-  positive values make a light touch play louder, negative ones softer.
-- **Transpose and Tune**, in the header: the keys shifted by up to an octave, and the pitch of the whole instrument by up to
-  ±100 cents (A = 432 Hz is −31.8 cents).
-- **Level meter:** the output peak of each channel under the instrument's name, with the limiter's threshold marked;
-  **LIM** lights while the limiter holds a peak back.
-- **Fifteen more factory presets** that use the voicing and the new controls: Mark I Bark, Mark I Ballad, Mark II Suitcase
-  Tremolo, Mark V Glass, Sparkle Top Dream, Wurlitzer Overdrive, Wurlitzer Tremolo, Pianet Echo, Clavinet Octave Bass,
-  Clavinet Phaser, Splendid Grand Intimate, Salamander Concert Hall, Salamander A=432, Honky-Tonk Upright, Felt Upright.
-  They follow the old ones in the list, so the MIDI programs 0–13 are what they were.
-- **Tooltips** say what each control does, the voicing controls in the words of the loaded instrument.
-- **Effects on a mono output:** the FX switch did nothing on a mono track. The chain now runs there too (the Vari-Pan
-  becomes a tremolo).
-- **Latency reported to the host:** about 0.58 ms, the same for every instrument, so recorded notes line up.
+This release has no new controls. Every instrument was checked key by key against its neighbours and against its
+recordings, and the keys that stood out were fixed.
+
+- **Splendid Grand:** many keys from G4 up sounded thin and short, G4, G5, D6 and G6 most of all. Their recordings have the
+  two channels in opposite phase, and the mono mix the voice is built from cancelled the body of the tone and left the
+  strike. The voice is rebuilt from a mix that keeps the body. E6 and C♯7 to E7 no longer drop after the strike, and B♭5,
+  A6 and D♯7 ring closer to their neighbours.
+- **Upright:** D3, D♯3 and E3 struck about 3 dB harder than the keys around them. The Upright plays one recording over
+  three keys, and the groups rang for different lengths; the largest steps (around A5 and C6, around F♯7, and the soft C5)
+  are halved or gone.
+- **Wurlitzer:** D♯5, F♯5 and G♯5 struck harder than their neighbours, and F♯5 could reach full scale. Soft notes in
+  the bass now set in as fast as on the recordings (after about 10 ms instead of 20 ms at C2).
+- **Mark I and Sparkle Top:** the hard attack of G4 to A4 (Mark I) and of E3 (Sparkle Top) is evened out.
+- **Mark II:** the treble from D6 was too soft at the strike and now has the short knock of the action its recordings
+  show. Single keys no longer run away from their neighbours above velocity 100, and E1 to G♯1 are less harsh when
+  struck hard.
+- **Mark V:** the hard attack of B♭4 to G5 and of E3 is evened out; C6 no longer runs away at high velocity.
+- **Mark 7:** the attack now hardens with the velocity over the whole keyboard, as on the recordings. Before, it did so
+  only on five keys, which stood 3–5 dB above the rest when struck hard.
+- **Mark 8:** the hard attack of E6 to G♯6 and of four more keys is evened out.
 
 ## What changes for existing projects
 
-Projects and user presets of 0.2.x load unchanged; the new controls start at their neutral values.
+Projects and user presets of 0.3.0 and 0.2.x load unchanged. No control and no preset value changes; the instruments
+themselves sound different on the keys named above.
 
-- **Five factory presets are quieter:** Mark I Vari-Pan, Mark II Phaser, Mark 7 Chorus, Mark 8 and Wurlitzer Chorus are
-  2–3.5 dB down, because a chord at a moderate velocity already had the limiter working. A project keeps the level it was
-  saved with; only loading the preset anew gives the lower one.
-- **Timing:** the hybrid voices (Clavinet, the pianos), and the Rhodes and reed pianos at 44.1 kHz, answer about 0.58 ms
-  later than before, so that every instrument has the latency the host is told. In a project the host compensates for it.
+- **Splendid Grand:** every key is rebuilt, and the voice is about 1 dB louder.
+- **Mark 7:** hard playing is louder; the highest single-note peak at velocity 120 rises by 2 dB.
+- **Mark II:** E1 to G♯1 are up to 3 dB quieter at the highest velocities.
 
 ## Downloads
 
 | File | Contents |
 |---|---|
-| `ToneWerk-0.3.0-macOS.zip` | VST3, AU, CLAP, Standalone – universal (Apple Silicon and Intel), macOS 11+ |
-| `ToneWerk-0.3.0-Windows.zip` | VST3, CLAP, Standalone (x64) |
-| `ToneWerk-0.3.0-Linux.zip` | VST3, CLAP, Standalone (x64) |
+| `ToneWerk-0.3.1-macOS.zip` | VST3, AU, CLAP, Standalone – universal (Apple Silicon and Intel), macOS 11+ |
+| `ToneWerk-0.3.1-Windows.zip` | VST3, CLAP, Standalone (x64) |
+| `ToneWerk-0.3.1-Linux.zip` | VST3, CLAP, Standalone (x64) |
 
 Each zip contains the licence (`LICENSE.txt`) and the credits of the recordings the hybrid voices are built from
 (`CREDITS.md`).
