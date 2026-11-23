@@ -1,31 +1,42 @@
-Sparkle Top: the notes around C4 no longer sound slightly distorted.
+Seven new factory presets: the Rhodes sounds of seven classic intros.
 
-![ToneWerk](https://github.com/Michi71/ToneWerk/raw/v0.3.2/docs/images/tonewerk.png)
+![ToneWerk](https://github.com/Michi71/ToneWerk/raw/v0.3.3/docs/images/tonewerk.png)
 
 ▶ [Watch the video](https://youtu.be/U0xUk3iMI5s): the first fourteen factory presets one after the other, three minutes (recorded with 0.2.1).
 
 ## What is new
 
-This release fixes one instrument and has no new controls.
+This release adds presets and has no new controls. The instruments sound as in 0.3.2.
 
-- **Sparkle Top:** C4 and C♯4 carried an off-pitch tone beside the note, between a major third and a fourth above it,
-  that rang for about a second and sounded like slight distortion, most of all when struck hard. It comes from the
-  tonebar, which rang far longer in the model than on the recordings. It now dies away as fast as there (within about a
-  tenth of a second), from C4 up. D4 to B♭5 had the same ring for a shorter time and lose it too.
+- **Seven Rhodes intro presets** at the end of the preset list (MIDI programs 29 to 35):
+
+  | Preset | Instrument | Effects |
+  |---|---|---|
+  | Just The 2 Of Us | Mark I | Vari-Pan, phaser, reverb |
+  | 100 Ways | Mark I | phaser |
+  | How Deep Is Your Love | Mark I | Vari-Pan, phaser, reverb |
+  | You Are The Sunshine Of My Life | Mark I | Vari-Pan |
+  | Riders On The Storm | Mark V | Vari-Pan, a little drive |
+  | Just The Way You Are | Mark 7 | Vari-Pan, phaser, a little drive |
+  | Livin For The City | Sparkle Top | Vari-Pan, a little drive |
+
+  Each was fitted to a reference recording of its intro: the pickup and hammer voicing, the tone controls, the depth of
+  the Vari-Pan and the level. The fit was measured (spectrum from 100 Hz to 4 kHz, left/right movement, loudness), not
+  tuned by ear, so take them as starting points. Above 5 kHz the presets are brighter than the references, "Just The
+  Way You Are" most of all: turn **Treble** down if it is too sharp.
 
 ## What changes for existing projects
 
-Projects and user presets of 0.3.x and 0.2.x load unchanged. No control and no preset value changes; the Sparkle Top
-sounds different in the attack of C4 to B♭5, cleaner and with less of a ring after the strike. All other instruments
-and the other keys of the Sparkle Top are unchanged.
+Projects and user presets of 0.3.x and 0.2.x load unchanged. No control, no instrument and no existing preset changes;
+the factory presets that were there keep their place in the list and their MIDI program numbers.
 
 ## Downloads
 
 | File | Contents |
 |---|---|
-| `ToneWerk-0.3.2-macOS.zip` | VST3, AU, CLAP, Standalone – universal (Apple Silicon and Intel), macOS 11+ |
-| `ToneWerk-0.3.2-Windows.zip` | VST3, CLAP, Standalone (x64) |
-| `ToneWerk-0.3.2-Linux.zip` | VST3, CLAP, Standalone (x64) |
+| `ToneWerk-0.3.3-macOS.zip` | VST3, AU, CLAP, Standalone – universal (Apple Silicon and Intel), macOS 11+ |
+| `ToneWerk-0.3.3-Windows.zip` | VST3, CLAP, Standalone (x64) |
+| `ToneWerk-0.3.3-Linux.zip` | VST3, CLAP, Standalone (x64) |
 
 Each zip contains the licence (`LICENSE.txt`) and the credits of the recordings the hybrid voices are built from
 (`CREDITS.md`).
