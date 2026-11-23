@@ -84,6 +84,9 @@ public:
     void seedHumanize (uint64_t seed) { humanize_.seed (seed); }
     // true when the voice built for the current parameters plays (tests; the audio thread adopts it in processBlock)
     bool instrumentReady() const { return readyGeneration_.load() == wantedSignature(); }
+    // true when the loader has built a voice the audio thread has not adopted yet (an offline render waits for it without
+    // processing audio, which would swallow what still sounds)
+    bool instrumentBuilt() const { return pending_.load() != nullptr; }
     // true while the voice before a voicing change still rings out (tests; set on the audio thread)
     bool ringingOut() const { return ringingFlag_.load (std::memory_order_relaxed); }
 

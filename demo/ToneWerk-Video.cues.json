@@ -1,0 +1,153 @@
+{
+ "fps": 30,
+ "bpm": 92,
+ "length": 91.69565217391305,
+ "end_card": 84.47826086956522,
+ "captions": [
+  {
+   "start": 2.758695652173913,
+   "end": 10.284782608695652,
+   "title": "Rhodes Mark I",
+   "text": "A physical model: tine, tonebar, hammer and pickup"
+  },
+  {
+   "start": 10.584782608695653,
+   "end": 18.110869565217392,
+   "title": "From soft to hard",
+   "text": "The tone follows every strike"
+  },
+  {
+   "start": 19.715217391304346,
+   "end": 28.545652173913044,
+   "title": "Wurlitzer 200A",
+   "text": "Reed piano, a physical model too"
+  },
+  {
+   "start": 30.15,
+   "end": 38.9804347826087,
+   "title": "Hohner Clavinet D6",
+   "text": "Through the MK8 preamp and compressor"
+  },
+  {
+   "start": 40.58478260869565,
+   "end": 52.02391304347826,
+   "title": "Splendid Grand Piano",
+   "text": "Hybrid: a sampled attack turns into 48 computed modes per key"
+  },
+  {
+   "start": 53.62826086956522,
+   "end": 57.24130434782609,
+   "title": "Voicing while you play",
+   "text": "Hammer hardness and pickup offset"
+  },
+  {
+   "start": 57.541304347826085,
+   "end": 65.06739130434782,
+   "title": "Seamless voicing",
+   "text": "Ringing notes keep their character, new notes get the new settings"
+  },
+  {
+   "start": 66.67173913043479,
+   "end": 70.28478260869565,
+   "title": "MK8 effect chain",
+   "text": "Dry first"
+  },
+  {
+   "start": 70.58478260869566,
+   "end": 72.89347826086956,
+   "title": "Vari-Pan",
+   "text": "Moves the sound between left and right"
+  },
+  {
+   "start": 73.19347826086957,
+   "end": 75.50217391304348,
+   "title": "+ Chorus",
+   "text": ""
+  },
+  {
+   "start": 75.80217391304349,
+   "end": 78.11086956521739,
+   "title": "+ Phaser",
+   "text": ""
+  },
+  {
+   "start": 78.4108695652174,
+   "end": 80.71956521739129,
+   "title": "+ Reverb",
+   "text": "A feedback delay network"
+  },
+  {
+   "start": 81.0195652173913,
+   "end": 83.32826086956521,
+   "title": "Light on the CPU",
+   "text": "Every key held with the pedal: 4-9 % of one core (Apple M4 Max, 48 kHz)"
+  }
+ ],
+ "highlights": [
+  {
+   "start": 57.24130434782609,
+   "end": 59.041304347826085,
+   "id": "voicing_hardness"
+  },
+  {
+   "start": 58.34130434782609,
+   "end": 59.94130434782608,
+   "id": "voicing_pickup_offset"
+  },
+  {
+   "start": 70.33478260869566,
+   "end": 72.03478260869565,
+   "id": "fx_on"
+  },
+  {
+   "start": 70.33478260869566,
+   "end": 72.03478260869565,
+   "id": "pan_on"
+  },
+  {
+   "start": 72.94347826086957,
+   "end": 74.64347826086956,
+   "id": "chorus_on"
+  },
+  {
+   "start": 75.55217391304349,
+   "end": 77.25217391304348,
+   "id": "phaser_on"
+  },
+  {
+   "start": 78.1608695652174,
+   "end": 79.86086956521739,
+   "id": "reverb_on"
+  }
+ ],
+ "sections": [
+  {
+   "start": 0.0,
+   "name": "Just The 2 Of Us"
+  },
+  {
+   "start": 18.26086956521739,
+   "name": "Wurlitzer 200A"
+  },
+  {
+   "start": 28.695652173913043,
+   "name": "Clavinet Funk"
+  },
+  {
+   "start": 39.130434782608695,
+   "name": "Splendid Grand"
+  },
+  {
+   "start": 52.17391304347826,
+   "name": "Mark I Stage"
+  },
+  {
+   "start": 65.21739130434783,
+   "name": "Mark I Stage"
+  },
+  {
+   "start": 83.47826086956522,
+   "name": "End"
+  }
+ ]
+}
