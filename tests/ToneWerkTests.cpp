@@ -245,6 +245,86 @@ TEST_CASE ("Switching the effects while playing does not click", "[audio][fx]")
         }
 }
 
+// A program change while a pedalled chord still sounds: a loud preset with effects and reverb gives way to a plain one of
+// another instrument. The level must not rise above what sounded before the switch (peaks of 5 ms windows, both channels).
+TEST_CASE ("Loading a factory preset while notes sound does not burst", "[audio][presets]")
+{
+    PluginProcessor plugin;
+    constexpr double rate = 48000.0;
+    constexpr int block = 256;
+    plugin.setRateAndBufferSizeDetails (rate, block);
+    plugin.prepareToPlay (rate, block);
+    const auto names = plugin.presets().factoryNames();
+    const int from = names.indexOf ("Just The 2 Of Us"), to = names.indexOf ("Wurlitzer 200A");
+    REQUIRE (from >= 0);
+    REQUIRE (to >= 0);
+    REQUIRE (plugin.presets().loadFactory (from));
+    setParam (plugin, tw::ids::humanize, 0.0f); // measurements at the nominal velocity
+    REQUIRE (waitForInstrumentAlone (plugin, block));
+
+    juce::AudioBuffer<float> buffer (2, block);
+    std::vector<float> out; // the larger magnitude of the two channels
+    auto run = [&] (juce::MidiBuffer& midi) {
+        buffer.clear();
+        plugin.processBlock (buffer, midi);
+        for (int i = 0; i < block; ++i)
+            out.push_back (std::max (std::abs (buffer.getSample (0, i)), std::abs (buffer.getSample (1, i))));
+    };
+    const int releaseBlock = int (1.0 * rate / block), switchBlock = int (1.2 * rate / block);
+    for (int b = 0; b <= switchBlock; ++b)
+    {
+        juce::MidiBuffer midi;
+        if (b == 0)
+        {
+            midi.addEvent (juce::MidiMessage::controllerEvent (1, 64, 127), 0);
+            for (const int note : { 48, 55, 60, 64 })
+                midi.addEvent (juce::MidiMessage::noteOn (1, note, (juce::uint8) 100), 0);
+        }
+        if (b == releaseBlock)
+            for (const int note : { 48, 55, 60, 64 })
+                midi.addEvent (juce::MidiMessage::noteOff (1, note), 0);
+        if (b == switchBlock)
+            midi.addEvent (juce::MidiMessage::programChange (1, to), block - 1);
+        run (midi);
+    }
+    const size_t at = out.size();
+    plugin.dispatchMidi(); // the plugin's timer: loads the factory preset
+    CHECK (plugin.presets().currentName() == "Wurlitzer 200A");
+    // on through the build of the new instrument (the loader's thread, in real time) and the fade of the old one
+    const auto until = juce::Time::getMillisecondCounterHiRes() + 30000.0;
+    juce::MidiBuffer none;
+    for (int b = 0; b < int (0.3 * rate / block) || !plugin.instrumentReady(); ++b)
+    {
+        REQUIRE (juce::Time::getMillisecondCounterHiRes() < until);
+        run (none);
+        if (!plugin.instrumentReady())
+            juce::Thread::sleep (1);
+    }
+    for (int b = 0; b < int (0.2 * rate / block); ++b)
+        run (none);
+
+    const size_t win = size_t (0.005 * rate);
+    auto peak = [&] (size_t begin) { return double (*std::max_element (out.begin() + long (begin), out.begin() + long (begin + win))); };
+    double before = 0.0, after = 0.0;
+    size_t worst = at;
+    for (size_t i = at - 40 * win; i < at; i += win) // the 200 ms since the keys went up
+        before = std::max (before, peak (i));
+    for (size_t i = at; i + win <= out.size(); i += win)
+        if (const double p = peak (i); p > after)
+        {
+            after = p;
+            worst = i;
+        }
+    REQUIRE (before > 0.01);
+    const double riseDb = juce::Decibels::gainToDecibels (after / before);
+    WARN ("peak before the switch " << juce::Decibels::gainToDecibels (before) << " dBFS, largest after it "
+                                    << juce::Decibels::gainToDecibels (after) << " dBFS (" << riseDb << " dB) at "
+                                    << double (worst - at) * 1000.0 / rate << " ms");
+    // what remains is the old instrument at the new preset's settings (here without its effects, 2 dB up) until the new one
+    // is built; the burst was 10 dB
+    CHECK (riseDb < 3.0);
+}
+
 TEST_CASE ("User presets round-trip", "[presets]")
 {
     PluginProcessor plugin;

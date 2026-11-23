@@ -418,11 +418,14 @@ void PluginProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::Midi
     // the host rate. A switch cross-fades the stage in or out over kSwitchMs: the hard switch clicked (measured: the largest
     // step 4.7 times the chord's own when the chain came in)
     // (a mono output: both run in stereo on a scratch channel and are folded down below)
+    // A stage that fades out keeps the settings it had: a preset that switches it off also moves its controls (to their
+    // defaults: more drive, other tone controls), and the stage fading out played them at the old level (measured: 10 dB above
+    // the chord for the length of the fade).
     const bool fxOn = fxp_.on->load() > 0.5f;
     const bool reverbOn = rvp_.on->load() > 0.5f;
-    if (fxOn || fxGain_ > 0.0f)
+    if (fxOn)
         updateEffects();
-    if (reverbOn || reverbGain_ > 0.0f)
+    if (reverbOn)
     {
         tw::Reverb::Settings rs;
         rs.mix = rvp_.mix->load() * 0.01f;
