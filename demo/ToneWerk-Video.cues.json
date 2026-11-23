@@ -1,8 +1,8 @@
 {
  "fps": 30,
  "bpm": 92,
- "length": 91.69565217391305,
- "end_card": 84.47826086956522,
+ "length": 96.91304347826087,
+ "end_card": 89.69565217391305,
  "captions": [
   {
    "start": 2.758695652173913,
@@ -24,99 +24,110 @@
   },
   {
    "start": 30.15,
-   "end": 38.9804347826087,
+   "end": 36.37173913043478,
    "title": "Hohner Clavinet D6",
    "text": "Through the MK8 preamp and compressor"
   },
   {
-   "start": 40.58478260869565,
-   "end": 52.02391304347826,
+   "start": 36.67173913043478,
+   "end": 44.197826086956525,
+   "title": "Touch wah",
+   "text": "Envelope at full: the harder you play, the further the filter opens"
+  },
+  {
+   "start": 45.802173913043475,
+   "end": 57.24130434782609,
    "title": "Splendid Grand Piano",
    "text": "Hybrid: a sampled attack turns into 48 computed modes per key"
   },
   {
-   "start": 53.62826086956522,
-   "end": 57.24130434782609,
+   "start": 58.845652173913045,
+   "end": 62.458695652173915,
    "title": "Voicing while you play",
    "text": "Hammer hardness and pickup offset"
   },
   {
-   "start": 57.541304347826085,
-   "end": 65.06739130434782,
+   "start": 62.75869565217391,
+   "end": 70.28478260869565,
    "title": "Seamless voicing",
    "text": "Ringing notes keep their character, new notes get the new settings"
   },
   {
-   "start": 66.67173913043479,
-   "end": 70.28478260869565,
+   "start": 71.88913043478261,
+   "end": 75.50217391304348,
    "title": "MK8 effect chain",
    "text": "Dry first"
   },
   {
-   "start": 70.58478260869566,
-   "end": 72.89347826086956,
+   "start": 75.80217391304349,
+   "end": 78.11086956521739,
    "title": "Vari-Pan",
    "text": "Moves the sound between left and right"
   },
   {
-   "start": 73.19347826086957,
-   "end": 75.50217391304348,
+   "start": 78.4108695652174,
+   "end": 80.71956521739129,
    "title": "+ Chorus",
    "text": ""
   },
   {
-   "start": 75.80217391304349,
-   "end": 78.11086956521739,
+   "start": 81.0195652173913,
+   "end": 83.32826086956521,
    "title": "+ Phaser",
    "text": ""
   },
   {
-   "start": 78.4108695652174,
-   "end": 80.71956521739129,
+   "start": 83.62826086956522,
+   "end": 85.93695652173912,
    "title": "+ Reverb",
    "text": "A feedback delay network"
   },
   {
-   "start": 81.0195652173913,
-   "end": 83.32826086956521,
+   "start": 86.23695652173913,
+   "end": 88.54565217391304,
    "title": "Light on the CPU",
    "text": "Every key held with the pedal: 4-9 % of one core (Apple M4 Max, 48 kHz)"
   }
  ],
  "highlights": [
   {
-   "start": 57.24130434782609,
-   "end": 59.041304347826085,
+   "start": 35.60173913043479,
+   "end": 36.901739130434784,
+   "id": "fx_envelope"
+  },
+  {
+   "start": 62.458695652173915,
+   "end": 64.25869565217391,
    "id": "voicing_hardness"
   },
   {
-   "start": 58.34130434782609,
-   "end": 59.94130434782608,
+   "start": 63.55869565217392,
+   "end": 65.15869565217392,
    "id": "voicing_pickup_offset"
-  },
-  {
-   "start": 70.33478260869566,
-   "end": 72.03478260869565,
-   "id": "fx_on"
-  },
-  {
-   "start": 70.33478260869566,
-   "end": 72.03478260869565,
-   "id": "pan_on"
-  },
-  {
-   "start": 72.94347826086957,
-   "end": 74.64347826086956,
-   "id": "chorus_on"
   },
   {
    "start": 75.55217391304349,
    "end": 77.25217391304348,
-   "id": "phaser_on"
+   "id": "fx_on"
+  },
+  {
+   "start": 75.55217391304349,
+   "end": 77.25217391304348,
+   "id": "pan_on"
   },
   {
    "start": 78.1608695652174,
    "end": 79.86086956521739,
+   "id": "chorus_on"
+  },
+  {
+   "start": 80.7695652173913,
+   "end": 82.46956521739129,
+   "id": "phaser_on"
+  },
+  {
+   "start": 83.37826086956522,
+   "end": 85.07826086956521,
    "id": "reverb_on"
   }
  ],
@@ -134,19 +145,19 @@
    "name": "Clavinet Funk"
   },
   {
-   "start": 39.130434782608695,
+   "start": 44.34782608695652,
    "name": "Splendid Grand"
   },
   {
-   "start": 52.17391304347826,
+   "start": 57.391304347826086,
    "name": "Mark I Stage"
   },
   {
-   "start": 65.21739130434783,
+   "start": 70.43478260869566,
    "name": "Mark I Stage"
   },
   {
-   "start": 83.47826086956522,
+   "start": 88.69565217391305,
    "name": "End"
   }
  ]

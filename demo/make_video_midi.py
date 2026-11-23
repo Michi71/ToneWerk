@@ -9,14 +9,15 @@
 # parameter_id value": the controls that move, for the "[.video]" render in tests/VideoRenderTests.cpp) and
 # ToneWerk-Video.cues.json (captions, highlighted controls and the sections, for demo/make_video.py).
 #
-# The sections: the hook on a classic Rhodes preset (soft to hard), three more instruments, a voicing change while notes
-# ring, the effect chain switched in unit by unit.
+# The sections: the hook on a classic Rhodes preset (soft to hard), three more instruments (the Clavinet also through the
+# touch wah), a voicing change while notes ring, the effect chain switched in unit by unit.
 import json
 import sys
 
 from make_demo_midi import BAR, B, E, PPQ, S, Track
 
 BPM = 92
+WAH_DB = 11.0  # how far the output comes down while the touch wah is at full
 FPS = 30
 
 
@@ -99,17 +100,18 @@ def wurli(s, t0):  # three bars of a soul riff: bass on the beat, chords on the 
     return t0 + 3 * BAR
 
 
-def clav(s, t0):  # three bars of a sixteenth-note riff
+def clav(s, t0, shifts, touch=False):  # a sixteenth-note riff, one bar per shift
+    """touch: accents hard and ghost notes soft, for the touch wah (the harder the strike, the further the filter opens)."""
     t = s.t
     riff = [(52, 80), (None, 0), (55, 60), (52, 72), (None, 0), (57, 66), (55, 56), (52, 76),
             (None, 0), (50, 64), (52, 74), (None, 0), (55, 68), (None, 0), (57, 62), (58, 76)]
-    for bar, shift in enumerate([0, 5, 0]):
+    for bar, shift in enumerate(shifts):
         b0 = t0 + bar * BAR
         for k, (n, v) in enumerate(riff):
             if n is not None:
-                t.note(b0 + k * S, n + shift, S - 20, v)
-        t.chord(b0 + 3 * B + E, [64 + shift, 67 + shift, 70 + shift], S, 70)
-    return t0 + 3 * BAR
+                t.note(b0 + k * S, n + shift, S - 20, 44 + (v - 56) * 2.7 if touch else v)
+        t.chord(b0 + 3 * B + E, [64 + shift, 67 + shift, 70 + shift], S, 104 if touch else 70)
+    return t0 + len(shifts) * BAR
 
 
 def grand(s, t0):  # four bars: two chords that ring out, then single high notes over a quiet bass
@@ -194,8 +196,14 @@ def main(path):
     s.caption(a - 2 * B, b, "Wurlitzer 200A", "Reed piano, a physical model too")
 
     a = s.switch(b, "Clavinet Funk", 10)
-    b = clav(s, a)
-    s.caption(a - 2 * B, b, "Hohner Clavinet D6", "Through the MK8 preamp and compressor")
+    w = clav(s, a, [-7, -2])  # a fifth below the riff as written: the low register of the instrument
+    s.caption(a - 2 * B, w, "Hohner Clavinet D6", "Through the MK8 preamp and compressor")
+    # the preamp's envelope goes to full during the last beat: the same riff through the touch wah
+    s.ramp(w, "fx_envelope", 0, 100, -0.62, 0.5)
+    for k in range(16):  # the wah at full is much louder: the output comes down with it, below the limiter
+        s.set(w, "volume", -4 - WAH_DB * k / 15, offset=-0.62 + k / FPS)
+    b = clav(s, w, [-7, -2, -7], touch=True)
+    s.caption(w, b, "Touch wah", "Envelope at full: the harder you play, the further the filter opens")
 
     a = s.switch(b, "Splendid Grand", 11)
     b = grand(s, a)
