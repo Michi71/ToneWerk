@@ -12,6 +12,7 @@
 //                              the controls move in the picture as they act on the sound
 //   TONEWERK_VIDEO_FPS         frames per second (30)
 //   TONEWERK_VIDEO_SCALE       scale of the editor's picture (1.4: 1540 x 952 from the editor's 1100 x 680)
+//   TONEWERK_VIDEO_PICTURES=0  only audio.wav, in seconds instead of minutes (to check levels before the long run)
 //
 // A program change loads its factory preset as the plugin's timer would. The render is not in real time: where the
 // instrument has to be rebuilt it waits for the loader without processing audio, so nothing that still sounds is lost and a
@@ -79,6 +80,7 @@ TEST_CASE ("Render a MIDI file as sound and pictures of the editor", "[.video]")
     REQUIRE (dir.createDirectory().wasOk());
     const int fps = juce::jlimit (1, 120, env ("TONEWERK_VIDEO_FPS", "30").getIntValue());
     const float scale = juce::jlimit (0.25f, 4.0f, env ("TONEWERK_VIDEO_SCALE", "1.4").getFloatValue());
+    const bool pictures = env ("TONEWERK_VIDEO_PICTURES", "1") != "0";
 
     juce::FileInputStream in (cwd.getChildFile (midiPath));
     REQUIRE (in.openedOk());
@@ -190,6 +192,8 @@ TEST_CASE ("Render a MIDI file as sound and pictures of the editor", "[.video]")
             }
         }
 
+        if (!pictures)
+            continue;
         // the editor's timers (keyboard 20 Hz, meter 30 Hz) and the parameter attachments catch up, then the picture
         messages->runDispatchLoopUntil (55);
         const auto image = editor->createComponentSnapshot (editor->getLocalBounds(), true, scale);
