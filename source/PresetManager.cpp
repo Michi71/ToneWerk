@@ -166,11 +166,6 @@ namespace
         return presets;
     }
 
-    void setParameter (juce::AudioProcessorValueTreeState& state, const juce::String& id, float value)
-    {
-        if (auto* p = dynamic_cast<juce::RangedAudioParameter*> (state.getParameter (id)))
-            p->setValueNotifyingHost (p->convertTo0to1 (value));
-    }
 } // namespace
 
 PresetManager::PresetManager (juce::AudioProcessorValueTreeState& state) : state_ (state), folder_ (defaultFolder()) {}
@@ -214,11 +209,16 @@ juce::File PresetManager::fileFor (const juce::String& name) const
 
 bool PresetManager::exists (const juce::String& name) const { return fileFor (name).existsAsFile(); }
 
-void PresetManager::resetToDefaults()
+// Every parameter once, to the preset's value or its default: resetting all of them first let the audio thread play a state
+// between the two presets (the new one's switches with the defaults of everything else, at the old level).
+void PresetManager::apply (const std::function<std::optional<float> (const juce::String&)>& valueOf)
 {
     for (auto* p : state_.processor.getParameters())
         if (auto* r = dynamic_cast<juce::RangedAudioParameter*> (p))
-            r->setValueNotifyingHost (r->getDefaultValue());
+        {
+            const auto value = valueOf (r->paramID);
+            r->setValueNotifyingHost (value ? r->convertTo0to1 (*value) : r->getDefaultValue());
+        }
 }
 
 void PresetManager::setCurrent (const juce::String& name, bool factory)
@@ -233,10 +233,15 @@ bool PresetManager::loadFactory (int index)
     if (index < 0 || index >= int (all.size()))
         return false;
     const auto& f = all[size_t (index)];
-    resetToDefaults();
-    setParameter (state_, ids::instrument, float (juce::jmax (0, instrumentIndex (f.instrument))));
-    for (const auto& [id, value] : f.values)
-        setParameter (state_, id, value);
+    apply ([&f] (const juce::String& id) -> std::optional<float> {
+        if (id == ids::instrument)
+            return float (juce::jmax (0, instrumentIndex (f.instrument)));
+        std::optional<float> found; // a later entry of the list wins, as it did when they were set in turn
+        for (const auto& [key, value] : f.values)
+            if (id == key)
+                found = value;
+        return found;
+    });
     setCurrent (f.name, true);
     return true;
 }
@@ -248,13 +253,12 @@ bool PresetManager::loadUser (const juce::String& name)
         return false;
     // through the parameters, not replaceState: the host hears every change, parameters missing in an old file get defaults
     const auto tree = juce::ValueTree::fromXml (*xml);
-    resetToDefaults();
-    for (const auto& id : allParameterIds())
-    {
+    apply ([&tree] (const juce::String& id) -> std::optional<float> {
         const auto child = tree.getChildWithProperty ("id", id);
         if (child.isValid() && child.hasProperty ("value"))
-            setParameter (state_, id, float (child.getProperty ("value")));
-    }
+            return float (child.getProperty ("value"));
+        return std::nullopt;
+    });
     // a preset saved with MIDI assignments brings them along; one without keeps the current ones
     if (const auto map = tree.getChildWithName (MidiLearn::kTreeType); map.isValid())
     {

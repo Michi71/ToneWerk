@@ -5,6 +5,9 @@
 
 #include <juce_audio_processors/juce_audio_processors.h>
 
+#include <functional>
+#include <optional>
+
 namespace tw
 {
 class PresetManager
@@ -48,7 +51,7 @@ public:
 
 private:
     juce::File fileFor (const juce::String& name) const;
-    void resetToDefaults();
+    void apply (const std::function<std::optional<float> (const juce::String&)>& valueOf);
     void setCurrent (const juce::String& name, bool factory);
 
     juce::AudioProcessorValueTreeState& state_;
