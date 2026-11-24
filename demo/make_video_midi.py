@@ -17,7 +17,9 @@ import sys
 from make_demo_midi import BAR, B, E, PPQ, S, Track
 
 BPM = 92
-WAH_DB = 11.0  # how far the output comes down while the touch wah is at full
+WAH_MID_DB = 12.0      # the touch wah on the Clavinet: the mid band gets gain ...
+WAH_MID_FREQ = 231.0   # ... and a low centre, as the Rhodes V8 Pro's preset "Envelope" has it
+WAH_DB = 6.0           # how far the output comes down while the mid band is up: the riff gets 6 dB louder
 FPS = 30
 
 
@@ -101,7 +103,7 @@ def wurli(s, t0):  # three bars of a soul riff: bass on the beat, chords on the 
 
 
 def clav(s, t0, shifts, touch=False):  # a sixteenth-note riff, one bar per shift
-    """touch: accents hard and ghost notes soft, for the touch wah (the harder the strike, the further the filter opens)."""
+    """touch: accents hard and ghost notes soft, for the touch wah (the harder the strike, the further up the mid band moves)."""
     t = s.t
     riff = [(52, 80), (None, 0), (55, 60), (52, 72), (None, 0), (57, 66), (55, 56), (52, 76),
             (None, 0), (50, 64), (52, 74), (None, 0), (55, 68), (None, 0), (57, 62), (58, 76)]
@@ -198,12 +200,15 @@ def main(path):
     a = s.switch(b, "Clavinet Funk", 10)
     w = clav(s, a, [-7, -2])  # a fifth below the riff as written: the low register of the instrument
     s.caption(a - 2 * B, w, "Hohner Clavinet D6", "Through the MK8 preamp and compressor")
-    # the preamp's envelope goes to full during the last beat: the same riff through the touch wah
+    # the preamp's envelope goes to full during the last beat, and the mid band gets gain and a low centre: the
+    # same riff through the touch wah. As on the Rhodes V8 Pro the envelope moves the mid band, so it needs the gain
     s.ramp(w, "fx_envelope", 0, 100, -0.62, 0.5)
-    for k in range(16):  # the wah at full is much louder: the output comes down with it, below the limiter
+    s.ramp(w, "fx_mid", 4, WAH_MID_DB, -0.62, 0.5)
+    s.ramp(w, "fx_mid_freq", 1200, WAH_MID_FREQ, -0.62, 0.5)
+    for k in range(16):  # the mid band at +12 dB makes the riff louder: the output comes down with it, below the limiter
         s.set(w, "volume", -4 - WAH_DB * k / 15, offset=-0.62 + k / FPS)
     b = clav(s, w, [-7, -2, -7], touch=True)
-    s.caption(w, b, "Touch wah", "Envelope at full: the harder you play, the further the filter opens")
+    s.caption(w, b, "Touch wah", "Envelope at full: the harder you play, the further up the mid band moves")
 
     a = s.switch(b, "Splendid Grand", 11)
     b = grand(s, a)

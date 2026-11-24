@@ -32,7 +32,7 @@
    "start": 36.67173913043478,
    "end": 44.197826086956525,
    "title": "Touch wah",
-   "text": "Envelope at full: the harder you play, the further the filter opens"
+   "text": "Envelope at full: the harder you play, the further up the mid band moves"
   },
   {
    "start": 45.802173913043475,
@@ -94,6 +94,16 @@
    "start": 35.60173913043479,
    "end": 36.901739130434784,
    "id": "fx_envelope"
+  },
+  {
+   "start": 35.60173913043479,
+   "end": 36.901739130434784,
+   "id": "fx_mid"
+  },
+  {
+   "start": 35.60173913043479,
+   "end": 36.901739130434784,
+   "id": "fx_mid_freq"
   },
   {
    "start": 62.458695652173915,
