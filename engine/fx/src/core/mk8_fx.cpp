@@ -98,51 +98,38 @@ void DelayLine::clear() {
     writeIndex_ = 0;
 }
 
-void WahWah::init(real sr) {
-    sampleRate_ = sr > 0 ? sr : real(48000);
-    freqSmoothCoeff_ = real(1) - std::exp(real(-1) / (sampleRate_ * real(0.005)));   // 5 ms
-    counter_ = 0;
-}
+} // namespace mk8fx
 
-void WahWah::reset() {
-    coreL_.reset();
-    coreR_.reset();
-    freqSmoothL_ = freqSmoothR_ = 300;
-    counter_ = 0;                        // the smoothing coefficient stays (set by init)
-}
+namespace mk8fx {
 
-void WahWah::setMidFreqNorm(real n) {
-    midFreqNorm_ = std::clamp<real>(n, 0, 1);
-    baseFreq_ = real(200) * std::exp(std::log(real(450) / real(200)) * midFreqNorm_);
-}
+// Envelope (the plugin's preamp_envelope): a slow level follower moves the centre of the mid
+// peak up in octaves, f = f_mid * 2^(amount * K(level)); gain and width stay. Measured on the
+// Rhodes V8 Pro 1.1.3 (its other effects off, Volume 53 %) as the ratio wet/dry of a triad that
+// the sustain pedal holds at a level, 200 strikes per point.
+constexpr real kEnvLevelDb[] = {-70, -59, -54.8, -50.6, -45.8, -42.4, -40.5, -36.3, -34};
+constexpr real kEnvOctaves[]  = {0, 0.4, 0.7, 1.1, 2.0, 3.2, 5.0, 6.3, 6.6};   // at Envelope 100 %
 
-void WahWah::processStereo(real& inL, real& inR, real envL, real envR) {
-    if (envAmount_ <= real(0.01)) return;
-    const real dryL = inL, dryR = inR;
+// The table is in dBFS of the plugin; the level the follower sees here is louder by this
+// amount. Fitted so that the engine's sweep on single notes (A2, A3, C4 at velocities 60..127,
+// preset mk8) matches the plugin's: 0.14 octaves rms error at 23 dB, 0.7 at the 19.7 dB that the
+// drive and the compressor take. Their 19.7 dB are not the level here: the dry outputs differ by
+// 27.9 dB in rms, and the limiter behind the follower has a small-signal gain of 1.8 dB.
+constexpr real kPluginLevelDb = real(23.0);
+constexpr real kEnvAttackSec  = real(0.18);      // level follower, rising: fit to the measured courses
+constexpr real kEnvReleaseSec = real(0.15);      // falling
 
-    // closed ~200-450 Hz (base), fully open 3 kHz
-    const real curveL = std::sqrt(std::clamp<real>(envL, 0, 1));
-    const real curveR = std::sqrt(std::clamp<real>(envR, 0, 1));
-    const real targetL = std::clamp<real>(baseFreq_ + (3000 - baseFreq_) * curveL * envAmount_, 150, 3200);
-    const real targetR = std::clamp<real>(baseFreq_ + (3000 - baseFreq_) * curveR * envAmount_, 150, 3200);
-    freqSmoothL_ += freqSmoothCoeff_ * (targetL - freqSmoothL_);
-    freqSmoothR_ += freqSmoothCoeff_ * (targetR - freqSmoothR_);
-
-    // resonance 3.5 (closed) .. 14 (open), scaled by the wah depth
-    const real qL = real(3.5) + real(10.5) * midGainNorm_ * curveL;
-    const real qR = real(3.5) + real(10.5) * midGainNorm_ * curveR;
-    if ((counter_++ & 7) == 0) {         // coefficients every 8 samples
-        coreL_.setParams(freqSmoothL_, qL, sampleRate_);
-        coreR_.setParams(freqSmoothR_, qR, sampleRate_);
-    }
-
-    const real wetL = coreL_.process(fastTanh(inL * real(1.05)) / real(1.05));
-    const real wetR = coreR_.process(fastTanh(inR * real(1.05)) / real(1.05));
-    // 12 % wet at rest .. 88 % at the peak: the wah sweeps over the piano
-    const real mixL = real(0.12) + real(0.76) * curveL * envAmount_;
-    const real mixR = real(0.12) + real(0.76) * curveR * envAmount_;
-    inL = dryL * (real(1) - mixL) + wetL * mixL;
-    inR = dryR * (real(1) - mixR) + wetR * mixR;
+// Between the points linear. Below -59 dBFS the measurement loses resolution (the sweep is
+// small there), so it goes down to silence; above -34 dBFS the plugin's sweep does not grow.
+real envelopeOctaves(real levelDb, real amount) {
+    constexpr int n = int(sizeof(kEnvLevelDb) / sizeof(kEnvLevelDb[0]));
+    real k = kEnvOctaves[n - 1];
+    for (int i = 1; i < n; ++i)
+        if (levelDb < kEnvLevelDb[i]) {
+            const real t = std::clamp<real>((levelDb - kEnvLevelDb[i - 1]) / (kEnvLevelDb[i] - kEnvLevelDb[i - 1]), 0, 1);
+            k = kEnvOctaves[i - 1] + t * (kEnvOctaves[i] - kEnvOctaves[i - 1]);
+            break;
+        }
+    return k * amount;
 }
 
 } // namespace mk8fx
@@ -182,15 +169,14 @@ Mk8Effects::Mk8Effects() { sin_.init(); }
 
 void Mk8Effects::init(real sr) {
     sampleRate_ = sr >= 1 ? sr : real(48000);
-    levelCoeff_      = real(1) - std::exp(real(-1) / (sampleRate_ * real(0.030)));   // 30 ms RMS
-    envAttackCoeff_  = real(1) - std::exp(real(-1) / (sampleRate_ * real(0.008)));   // 8 ms
-    envReleaseCoeff_ = real(1) - std::exp(real(-1) / (sampleRate_ * real(0.200)));   // 200 ms
+    envPowerCoeff_   = real(1) - std::exp(real(-1) / (sampleRate_ * real(0.008)));   // 8 ms mean square
+    envAttackCoeff_  = real(1) - std::exp(real(-1) / (sampleRate_ * mk8fx::kEnvAttackSec));
+    envReleaseCoeff_ = real(1) - std::exp(real(-1) / (sampleRate_ * mk8fx::kEnvReleaseSec));
     chorusL_.init(int(sampleRate_ * real(0.05)));
     chorusR_.init(int(sampleRate_ * real(0.05)));
     const int delayLen = int(sampleRate_ * (delaySec_ + real(0.05)));   // as set (up to 4 s)
     delayL_.init(delayLen);
     delayR_.init(delayLen);
-    wah_.init(sampleRate_);
     for (auto& f : driveLP_) f.setCutoff(2150, sampleRate_);
     for (int ch = 0; ch < 2; ++ch) {
         echoTone_[ch].setup(sampleRate_);
@@ -206,9 +192,8 @@ void Mk8Effects::init(real sr) {
 }
 
 void Mk8Effects::reset() {
-    inputRmsSmooth_ = 0;
-    envState_[0] = envState_[1] = 0;
-    wah_.reset();
+    envPower_ = envLevel_ = 0;
+    envCounter_ = 0;
     for (int ch = 0; ch < 2; ++ch) {
         lowF_[ch].reset();
         midF_[ch].reset();
@@ -274,8 +259,10 @@ void Mk8Effects::updateEq() {
     const double gh = std::pow(10.0, double(highDb_) / 20.0);
     const double fz = gh >= 1.0 ? 355.0 : 355.0 / gh, fp = gh >= 1.0 ? 355.0 * gh : 355.0;
     for (auto& f : highF_) f.set(fz, fp, fp / fz, std::sqrt(fz * fp), fs);
-    const double f0 = 93.0 * std::pow(double(midHz_) / 100.0, 1.206);
-    for (auto& m : midF_) m.setPeaking(real(f0), sampleRate_, midDb_, midDb_ >= 0 ? real(2.2) : real(2.0));
+    midStaticHz_ = real(93.0 * std::pow(double(midHz_) / 100.0, 1.206));
+    midQ_ = midDb_ >= 0 ? real(2.2) : real(2.0);
+    midFreqHz_ = midStaticHz_;                    // the Envelope starts from the static centre
+    for (auto& m : midF_) m.setPeaking(midFreqHz_, sampleRate_, midDb_, midQ_);
 }
 
 real Mk8Effects::lfoValue(real phase, int waveform) const {
@@ -327,8 +314,6 @@ void Mk8Effects::process(float* outL, float* outR, int numFrames) {
     const real delayDry = real(1) - real(0.44) * std::pow(delayMix_, real(2.5));
     const bool phaserActive = phaserOn_ && phaserDepth_ > real(0.01);
     const real vol = volumeGain(volumePct_);
-    const real midFreqNorm = std::log(midHz_ / real(100)) / std::log(real(20));   // wah
-    const real midGainNorm = midDb_ / real(30) + real(0.5);
 
     for (int i = 0; i < numFrames; ++i) {
         real inL = real(outL[i]), inR = real(outR[i]);
@@ -352,27 +337,27 @@ void Mk8Effects::process(float* outL, float* outR, int numFrames) {
             inR *= g;
         }
 
-        // 3. envelope wah (touch-wah) or the static mid peak
-        if (useEnvelope) {
-            const real absL = std::fabs(inL), absR = std::fabs(inR);
-            // auto-sensitivity: a 30 ms level normalises the playing level
-            inputRmsSmooth_ += levelCoeff_ * (real(0.5) * (absL + absR) - inputRmsSmooth_);
-            const real norm = std::clamp<real>(real(0.10) / (inputRmsSmooth_ + real(1e-6)), real(0.4), 10);
-            const real envIn[2] = {std::clamp<real>(absL * norm, 0, 1), std::clamp<real>(absR * norm, 0, 1)};
-            for (int ch = 0; ch < 2; ++ch) {       // attack 8 ms, release 200 ms
-                real& env = envState_[ch];
-                const real diff = envIn[ch] - env;
-                env += (diff > 0 ? envAttackCoeff_ : envReleaseCoeff_) * diff;
-                env = std::clamp<real>(env, 0, 1);
+        // 3. mid peak. Its level follower runs always, on the signal after the drive and the
+        //    compressor as in the plugin (their gain deepens the sweep; the volume comes last).
+        //    With the Envelope the centre follows the level in octaves; gain and width stay.
+        envPower_ += envPowerCoeff_ * (real(0.5) * (inL * inL + inR * inR) - envPower_);
+        if (envPower_ < real(1e-30)) envPower_ = real(1e-30);          // stays normal in float
+        const real envAmp = std::sqrt(envPower_);
+        envLevel_ += (envAmp > envLevel_ ? envAttackCoeff_ : envReleaseCoeff_) * (envAmp - envLevel_);
+        if (useEnvelope && (envCounter_++ & 7) == 0) {   // centre every 8 samples
+            const real levelDb = lin2dB(envLevel_) - mk8fx::kPluginLevelDb;
+            // loud and high up the sweep would cross the Nyquist frequency, where the biquad is
+            // unstable: the centre stays below 0.45 of the sample rate
+            const real f = std::min(midStaticHz_ * std::exp2(mk8fx::envelopeOctaves(levelDb, envelope_)),
+                                    real(0.45) * sampleRate_);
+            if (std::fabs(std::log2(f / midFreqHz_)) > real(1.0 / 1200)) {   // a cent
+                midF_[0].setPeaking(f, sampleRate_, midDb_, midQ_);
+                midF_[1].setPeaking(f, sampleRate_, midDb_, midQ_);
+                midFreqHz_ = f;
             }
-            wah_.setMidFreqNorm(midFreqNorm);
-            wah_.setMidGainNorm(midGainNorm);
-            wah_.setEnvelopeAmount(envelope_);
-            wah_.processStereo(inL, inR, std::sqrt(envState_[0]), std::sqrt(envState_[1]));
-        } else {
-            inL = midF_[0].process(inL);
-            inR = midF_[1].process(inR);
         }
+        inL = midF_[0].process(inL);
+        inR = midF_[1].process(inR);
 
         // 4. bass and treble shelves
         inL = highF_[0].process(lowF_[0].process(inL));
@@ -389,11 +374,6 @@ void Mk8Effects::process(float* outL, float* outR, int numFrames) {
             inL *= db2lin(vpPanL_);
             inR *= db2lin(vpPanR_);
             vpPhase_ += vpInc_;
-        }
-
-        if (useEnvelope) {                          // headroom for chorus/delay
-            inL *= real(0.85);
-            inR *= real(0.85);
         }
 
         // 6. chorus as measured on the plugin: delay 1.5 ms + D (1 +- sin), D = 1.1 x depth,

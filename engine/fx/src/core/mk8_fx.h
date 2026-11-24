@@ -10,18 +10,21 @@
 //   drifted (phaser 28 dB, chorus 57 dB, Vari-Pan 51 dB between the float and double builds);
 // - reset() clears every state, so allSoundOff() renders like a fresh engine;
 // - the compressor starts without gain reduction (velvetkeys started at the 0.05 floor, -26 dB,
-//   and needed the release time to recover), the wah keeps its smoothing after a reset.
+//   and needed the release time to recover);
+// - the Envelope moves the centre of the mid peak as measured on the plugin; the touch-wah of
+//   velvetkeys is gone.
 //
-// Signal flow: drive (diode saturation, 10 kHz anti-fizz) -> compressor -> envelope wah or mid
-// peak -> bass and treble shelves -> Vari-Pan -> chorus -> phaser -> delay -> volume, soft limiter.
+// Signal flow: drive (diode saturation, 10 kHz anti-fizz) -> compressor -> mid peak, its centre
+// moved by the Envelope -> bass and treble shelves -> Vari-Pan -> chorus -> phaser -> delay ->
+// volume, soft limiter.
 // The compressor sits ahead of the mid filter like the hardware (the manual's hearing warning
 // pins it there); the V8 plugin runs it after the EQ, which the earlier per-stage fits followed.
 // (its output reaches 0.98 / fastTanh(0.9) = 1.34; the engine's soft clip follows).
 //
 // Calibration against the Rhodes V8 Pro plugin (docs/PLAN.md §11): the controls take the
 // plugin's units; effects measured on the plugin replace the velvetkeys ones step by step
-// (so far: EQ). The delay lines are allocated by init() for the delay time set then (not in the
-// real-time path).
+// (so far: EQ, Envelope). The delay lines are allocated by init() for the delay time set then
+// (not in the real-time path).
 #pragma once
 
 #include <algorithm>
@@ -47,6 +50,10 @@ inline real fastTan(real x) {
     const real x2 = x * x;
     return x * (real(1) + x2 * (real(0.333333333) + x2 * real(0.133333333)));
 }
+
+// sweep of the mid peak in octaves for a level at the mid filter (dBFS of the plugin) and an
+// Envelope amount 0..1: the characteristic measured on the Rhodes V8 Pro, K(level) * amount
+real envelopeOctaves(real levelDb, real amount);
 
 // sine table over one turn, linear interpolation
 template <int kSize = 2048>
@@ -137,51 +144,6 @@ private:
     int writeIndex_ = 0;
 };
 
-// state-variable filter of the MK8 wah: returns the wet signal only
-class Mk8WahCore {
-public:
-    void setParams(real cutoff, real q, real sr) {
-        cutoff = std::clamp<real>(cutoff, 50, sr * real(0.45));
-        q = std::clamp<real>(q, 0.5, 18);
-        g_ = fastTan(real(kPi) * cutoff / sr);
-        k_ = real(1) / q;
-        a1_ = real(1) / (real(1) + g_ * (g_ + k_));
-    }
-    real process(real x) {
-        const real hp = (x - (k_ + g_) * s1_ - s2_) * a1_;
-        const real bp = g_ * hp + s1_;
-        const real lp = g_ * bp + s2_;
-        s1_ = g_ * hp + bp;
-        s2_ = g_ * bp + lp;
-        // LP keeps the body, BP gives the "quack"; gentle saturation like the preamp
-        const real out = lp * real(0.30) + bp * real(10.0);
-        return fastTanh(out * real(0.8)) / real(0.8);
-    }
-    void reset() { s1_ = s2_ = 0; }
-
-private:
-    real s1_ = 0, s2_ = 0, g_ = 0, k_ = 1, a1_ = 0;
-};
-
-// envelope-controlled wah (touch-wah) around the MK8 curve
-class WahWah {
-public:
-    void init(real sr);
-    void reset();
-    void setMidFreqNorm(real n);
-    void setMidGainNorm(real n) { midGainNorm_ = std::clamp<real>(n, 0, 1); }
-    void setEnvelopeAmount(real n) { envAmount_ = std::clamp<real>(n, 0, 1); }
-    void processStereo(real& inL, real& inR, real envL, real envR);
-
-private:
-    real sampleRate_ = 48000;
-    Mk8WahCore coreL_, coreR_;
-    real midFreqNorm_ = real(0.5), midGainNorm_ = real(0.5), envAmount_ = 1;
-    real baseFreq_ = 300;                          // 200..450 Hz from midFreqNorm
-    real freqSmoothL_ = 300, freqSmoothR_ = 300, freqSmoothCoeff_ = 0;
-    int  counter_ = 0;
-};
-
 // post-drive one-pole low pass (anti-fizz)
 struct OnePoleLP {
     real a = 0, z = 0;
@@ -207,8 +169,9 @@ public:
     void process(float* left, float* right, int n);   // in place
 
     // Controls in the units of the Rhodes V8 Pro plugin (its parameter names in brackets).
-    // amp: volume and drive in % (preamp_volume, preamp_drive); the envelope wah is from
-    // velvetkeys (preamp_envelope has no effect in the plugin)
+    // amp: volume and drive in % (preamp_volume, preamp_drive); the envelope in %
+    // (preamp_envelope) moves the centre of the mid peak up in octaves with the level at the
+    // mid filter, as measured on the plugin; at 0 the peak stays where the EQ sets it
     void setVolume(real pct)   { volumePct_ = std::clamp<real>(pct, 0, 100); }
     void setDrive(real pct)    { drive_ = std::clamp<real>(pct, 0, 100) / 100; }
     void setEnvelope(real pct) { envelope_ = std::clamp<real>(pct, 0, 100) / 100; }
@@ -261,15 +224,17 @@ private:
     real chorusHz_ = 1, chorusMs_ = 0, phaserHz_ = 1, phaserDepth_ = 0;
     real delaySec_ = real(0.5), delayFeedback_ = 0, delayMix_ = real(0.5);
 
-    // envelope follower, wah
-    real levelCoeff_ = 0, envAttackCoeff_ = 0, envReleaseCoeff_ = 0;
-    real inputRmsSmooth_ = 0;
-    real envState_[2] = {};
-    mk8fx::WahWah wah_;
+    // Envelope: level follower of the mid peak (mean square of both channels, then a one-pole on
+    // its root: 0.18 s rising, 0.15 s falling), on the signal after the drive and the compressor
+    real envPowerCoeff_ = 0, envAttackCoeff_ = 0, envReleaseCoeff_ = 0;
+    real envPower_ = 0, envLevel_ = 0;
+    int envCounter_ = 0;
 
-    // EQ as measured on the plugin (PLAN §11): first-order shelves, mid peak Q 2.2
+    // EQ as measured on the plugin (PLAN §11): first-order shelves, mid peak Q 2.2; midStaticHz_
+    // its centre without Envelope, midFreqHz_ the current one
     mk8fx::FirstOrder lowF_[2], highF_[2];
     mk8fx::BiquadFilter midF_[2];
+    real midStaticHz_ = 93, midFreqHz_ = 93, midQ_ = real(2.2);
     real eqCache_[4] = {-99, -99, -99, -99};      // controls the coefficients belong to
 
     // drive (per block)

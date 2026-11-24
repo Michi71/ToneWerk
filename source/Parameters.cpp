@@ -138,7 +138,7 @@ juce::String parameterHelp (const juce::String& id, Family family)
         { ids::stretch, "Stretch tuning about C4, in cents per octave." },
         { ids::fxOn, "The whole MK8 effect chain on or off (the reverb has its own switch)." },
         { ids::fxDrive, "Preamp drive: diode saturation, from clean to growl." },
-        { ids::fxEnvelope, "Touch wah: the harder you play, the further the filter opens." },
+        { ids::fxEnvelope, "Touch wah: the harder you play, the further up the mid band moves (no effect at Mid 0 dB)." },
         { ids::fxVolume, "Preamp level into the effects that follow." },
         { ids::fxBass, "Bass shelf, -15 to +15 dB." },
         { ids::fxMid, "Mid band, -15 to +15 dB, at the frequency of Mid Freq." },
