@@ -248,7 +248,10 @@ void Mk8Effects::updateIncrements() {
 //   setting;
 // - treble: first-order shelf whose lower corner stays at 355 Hz, the upper one moves by the
 //   gain;
-// - mid: peak with Q 2.2 (cut 2.0) at 93 Hz x (setting / 100 Hz)^1.206, i.e. 93..3445 Hz.
+// - mid: peak at 93.9 Hz x (setting / 100 Hz)^1.206, i.e. 94..3480 Hz, with 1.29 x the
+//   setting (+15 dB peaks at +19.4 dB) and Q 2.85 (cut 2.9): a free fit of the plugin's static
+//   bell at 100..2000 Hz and +-3, 9, 15 dB found +-4, 12, 20 dB at Q 2.6..3.2; 0.2..0.5 dB rms
+//   over the bell, the former Q 2.2 at the setting 0.6..1.2 dB (docs/PLAN.md section 11).
 void Mk8Effects::updateEq() {
     if (eqCache_[0] == lowDb_ && eqCache_[1] == midDb_ && eqCache_[2] == midHz_ &&
         eqCache_[3] == highDb_)
@@ -263,10 +266,11 @@ void Mk8Effects::updateEq() {
     const double gh = std::pow(10.0, double(highDb_) / 20.0);
     const double fz = gh >= 1.0 ? 355.0 : 355.0 / gh, fp = gh >= 1.0 ? 355.0 * gh : 355.0;
     for (auto& f : highF_) f.set(fz, fp, fp / fz, std::sqrt(fz * fp), fs);
-    midStaticHz_ = real(93.0 * std::pow(double(midHz_) / 100.0, 1.206));
-    midQ_ = midDb_ >= 0 ? real(2.2) : real(2.0);
+    midStaticHz_ = real(93.9 * std::pow(double(midHz_) / 100.0, 1.206));
+    midGainDb_ = real(1.29) * midDb_;
+    midQ_ = midDb_ >= 0 ? real(2.85) : real(2.9);
     midFreqHz_ = midStaticHz_;                    // the Envelope starts from the static centre
-    for (auto& m : midF_) m.setPeaking(midFreqHz_, sampleRate_, midDb_, midQ_);
+    for (auto& m : midF_) m.setPeaking(midFreqHz_, sampleRate_, midGainDb_, midQ_);
 }
 
 real Mk8Effects::lfoValue(real phase, int waveform) const {
@@ -286,8 +290,10 @@ void Mk8Effects::process(float* outL, float* outR, int numFrames) {
     // compressor as measured on the plugin (PLAN §11): rms detector (9.1 ms) on the mean power
     // of both channels, hard knee, slope = amount (50 % = 2:1, 100 % = limiter), gain smoothed
     // in dB (attack 56 ms, release 11 ms), makeup a plain gain. The plugin's threshold of
-    // -58.7 dBFS, and the engine plays kEngineLevelDb above the plugin: -32.8 dBFS here.
-    const real thresholdDb = real(-58.7) + mk8fx::kEngineLevelDb;
+    // -58.7 dBFS, and the engine plays kEngineLevelDb above the plugin: -32.8 dBFS here
+    // (inputDb_ = 0).
+    // An input that plays inputDb_ above the engine is that much nearer the threshold.
+    const real thresholdDb = real(-58.7) + mk8fx::kEngineLevelDb + inputDb_;
     const real compMakeup = db2lin(makeupDb_);
 
     // drive: on from 1 % (the plugin bypasses it below); input and output gain interpolated
@@ -302,7 +308,7 @@ void Mk8Effects::process(float* outL, float* outR, int numFrames) {
         int i = 0;
         while (i < 4 && pct > kPct[i + 1]) ++i;
         const real t = std::clamp<real>((pct - kPct[i]) / (kPct[i + 1] - kPct[i]), 0, 1);
-        const real levelOffsetDb = mk8fx::kEngineLevelDb;
+        const real levelOffsetDb = mk8fx::kEngineLevelDb + inputDb_;
         drivePre_ = db2lin(kPre[i] + t * (kPre[i + 1] - kPre[i]) - levelOffsetDb);
         drivePost_ = db2lin(kPost[i] + t * (kPost[i + 1] - kPost[i]) + levelOffsetDb);
     }
@@ -348,14 +354,14 @@ void Mk8Effects::process(float* outL, float* outR, int numFrames) {
         const real envAmp = std::sqrt(envPower_);
         envLevel_ += (envAmp > envLevel_ ? envAttackCoeff_ : envReleaseCoeff_) * (envAmp - envLevel_);
         if (useEnvelope && (envCounter_++ & 7) == 0) {   // centre every 8 samples
-            const real levelDb = lin2dB(envLevel_) - mk8fx::kEnvLevelOffsetDb;
+            const real levelDb = lin2dB(envLevel_) - mk8fx::kEnvLevelOffsetDb - inputDb_;
             // loud and high up the sweep would cross the Nyquist frequency, where the biquad is
             // unstable: the centre stays below 0.45 of the sample rate
             const real f = std::min(midStaticHz_ * std::exp2(mk8fx::envelopeOctaves(levelDb, envelope_)),
                                     real(0.45) * sampleRate_);
             if (std::fabs(std::log2(f / midFreqHz_)) > real(1.0 / 1200)) {   // a cent
-                midF_[0].setPeaking(f, sampleRate_, midDb_, midQ_);
-                midF_[1].setPeaking(f, sampleRate_, midDb_, midQ_);
+                midF_[0].setPeaking(f, sampleRate_, midGainDb_, midQ_);
+                midF_[1].setPeaking(f, sampleRate_, midGainDb_, midQ_);
                 midFreqHz_ = f;
             }
         }

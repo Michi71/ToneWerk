@@ -180,6 +180,11 @@ public:
     void setMiddle(real db)     { midDb_ = std::clamp<real>(db, -15, 15); }
     void setMiddleFreq(real hz) { midHz_ = std::clamp<real>(hz, 100, 2000); }
     void setTreble(real db)     { highDb_ = std::clamp<real>(db, -15, 15); }
+    // Level of the input against this engine's own (kEngineLevelDb above the plugin), in dB:
+    // drive, compressor and the Envelope's follower take it, so that an instrument that plays
+    // quieter reaches them at the point of its dynamics where the plugin's Rhodes would. The
+    // output level stays. 0 for this engine's presets; a host with other instruments sets theirs.
+    void setInputLevel(real db) { inputDb_ = std::clamp<real>(db, -30, 30); }
     // Vari-Pan: on, waveform 0 square, 1 ramp, 2 triangle, 3 sine (pan_wave), rate 0.1..3800 Hz,
     // depth %
     void setPanOn(bool on)     { vpOn_ = on; }
@@ -213,7 +218,7 @@ private:
     real sampleRate_ = 48000;
 
     // controls (plugin units; fractions for %)
-    real volumePct_ = 53, envelope_ = 0, drive_ = 0;
+    real volumePct_ = 53, envelope_ = 0, drive_ = 0, inputDb_ = 0;
     real lowDb_ = 0, midDb_ = 0, midHz_ = 500, highDb_ = 0;
     bool vpOn_ = false;
     int  vpWave_ = 3;
@@ -230,11 +235,12 @@ private:
     real envPower_ = 0, envLevel_ = 0;
     int envCounter_ = 0;
 
-    // EQ as measured on the plugin (PLAN §11): first-order shelves, mid peak Q 2.2; midStaticHz_
+    // EQ as measured on the plugin (PLAN §11): first-order shelves, mid peak Q 2.85 with 1.29 x the
+    // setting (midGainDb_); midStaticHz_
     // its centre without Envelope, midFreqHz_ the current one
     mk8fx::FirstOrder lowF_[2], highF_[2];
     mk8fx::BiquadFilter midF_[2];
-    real midStaticHz_ = 93, midFreqHz_ = 93, midQ_ = real(2.2);
+    real midStaticHz_ = 94, midFreqHz_ = 94, midGainDb_ = 0, midQ_ = real(2.85);
     real eqCache_[4] = {-99, -99, -99, -99};      // controls the coefficients belong to
 
     // drive (per block)

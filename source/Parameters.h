@@ -81,6 +81,7 @@ struct Instrument
     const char* preset; // the engine's preset id
     const char* name;   // shown in the instrument choice
     float trimDb;       // the plugin's level balance on top of the engine preset
+    float fxLevelDb;    // its level into the MK8 chain against the level the chain is fitted to (Mk8Effects::setInputLevel)
 };
 const std::vector<Instrument>& instruments();
 const Instrument& instrument (int index); // clamped to the table

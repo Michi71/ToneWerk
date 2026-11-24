@@ -360,6 +360,9 @@ void PluginProcessor::renderSegment (float* left, float* right, int n)
 void PluginProcessor::updateEffects()
 {
     auto on = [] (std::atomic<float>* p) { return p->load() > 0.5f; };
+    // the instrument that plays (during a switch the one coming in) sets the level the chain's dynamics are fitted to
+    if (active_ != nullptr)
+        fx_.setInputLevel (tw::instrument (active_->config().instrument).fxLevelDb);
     fx_.setVolume (fxp_.volume->load());
     fx_.setDrive (fxp_.drive->load());
     fx_.setEnvelope (fxp_.envelope->load());

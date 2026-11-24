@@ -15,19 +15,23 @@ const std::vector<Instrument>& instruments()
     // them: at C4 velocity 100 the RMS of the first 200 ms was -25.3 (clavinet), -19.2 (Splendid), -25.1 (Salamander),
     // -18.0 dB (upright) against -21.3 ... -22.7 dB of the Rhodes (tests "[.levels]"). The Salamander gets 1 dB, not 3: its
     // sharp attacks put loud chords into the soft clip at +3 (0.013 % of the samples of chord4 v100, "[levels]")
+    // The MK8 chain's drive, compressor and Envelope are fitted to the level of the engine it comes from, the Rhodes V8 Pro's
+    // level plus 25.9 dB. fxLevelDb is how far each instrument plays from that (with its trim): the mean over A3 and C4 at
+    // velocities 36-127, rms 0.20-0.47 s before the chain, against the plugin's renders of the same notes, minus 25.9 dB
+    // (2026-11-24). Without it the Mark 8's A3 swept 2.0 octaves at velocity 127 against the plugin's 5.9.
     static const std::vector<Instrument> all {
-        { Family::Tines, "mark1", "Rhodes Mark I", 0.0f },
-        { Family::Tines, "mark2", "Rhodes Mark II", 0.0f },
-        { Family::Tines, "mark5", "Rhodes Mark V", 0.0f },
-        { Family::Tines, "mark7", "Rhodes Mark 7", 0.0f },
-        { Family::Tines, "mark8", "Rhodes Mark 8", 0.0f },
-        { Family::Tines, "sparkletop", "Rhodes Sparkle Top", 0.0f },
-        { Family::Reeds, "wurli", "Wurlitzer 200A", 0.0f },
-        { Family::Reeds, "pianet", "Hohner Pianet T", 0.0f },
-        { Family::Hybrid, "clavinet", "Hohner Clavinet D6", 3.0f },
-        { Family::Hybrid, "splendid_hybrid", "Splendid Grand Piano", -3.0f },
-        { Family::Hybrid, "salamander", "Salamander Grand Piano", 1.0f },
-        { Family::Hybrid, "upright", "Upright Piano KW", -4.0f },
+        { Family::Tines, "mark1", "Rhodes Mark I", 0.0f, -1.2f },
+        { Family::Tines, "mark2", "Rhodes Mark II", 0.0f, -1.3f },
+        { Family::Tines, "mark5", "Rhodes Mark V", 0.0f, -1.0f },
+        { Family::Tines, "mark7", "Rhodes Mark 7", 0.0f, -0.8f },
+        { Family::Tines, "mark8", "Rhodes Mark 8", 0.0f, -6.9f },
+        { Family::Tines, "sparkletop", "Rhodes Sparkle Top", 0.0f, -1.7f },
+        { Family::Reeds, "wurli", "Wurlitzer 200A", 0.0f, -1.3f },
+        { Family::Reeds, "pianet", "Hohner Pianet T", 0.0f, -0.7f },
+        { Family::Hybrid, "clavinet", "Hohner Clavinet D6", 3.0f, -3.4f },
+        { Family::Hybrid, "splendid_hybrid", "Splendid Grand Piano", -3.0f, -3.7f },
+        { Family::Hybrid, "salamander", "Salamander Grand Piano", 1.0f, -8.2f },
+        { Family::Hybrid, "upright", "Upright Piano KW", -4.0f, -4.2f },
     };
     return all;
 }
