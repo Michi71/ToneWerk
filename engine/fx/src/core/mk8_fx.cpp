@@ -102,6 +102,11 @@ void DelayLine::clear() {
 
 namespace mk8fx {
 
+// The engine output plays this much above the dry plugin: the rms of A2, A3, C4, C5 and C6 at
+// eight velocities against the plugin's renders, 25.9 dB (24.1..26.7 dB). The drive and the
+// compressor take it. It was 19.7 dB until the mk8 preset got 6 dB of trim on 2026-10-06.
+constexpr real kEngineLevelDb = real(25.9);
+
 // Envelope (the plugin's preamp_envelope): a slow level follower moves the centre of the mid
 // peak up in octaves, f = f_mid * 2^(amount * K(level)); gain and width stay. Measured on the
 // Rhodes V8 Pro 1.1.3 (its other effects off, Volume 53 %) as the ratio wet/dry of a triad that
@@ -109,12 +114,11 @@ namespace mk8fx {
 constexpr real kEnvLevelDb[] = {-70, -59, -54.8, -50.6, -45.8, -42.4, -40.5, -36.3, -34};
 constexpr real kEnvOctaves[]  = {0, 0.4, 0.7, 1.1, 2.0, 3.2, 5.0, 6.3, 6.6};   // at Envelope 100 %
 
-// The table is in dBFS of the plugin; the level the follower sees here is louder by this
-// amount. Fitted so that the engine's sweep on single notes (A2, A3, C4 at velocities 60..127,
-// preset mk8) matches the plugin's: 0.14 octaves rms error at 23 dB, 0.7 at the 19.7 dB that the
-// drive and the compressor take. Their 19.7 dB are not the level here: the dry outputs differ by
-// 27.9 dB in rms, and the limiter behind the follower has a small-signal gain of 1.8 dB.
-constexpr real kPluginLevelDb = real(23.0);
+// The table is in dBFS of the plugin, and the follower sees the level of the engine. Not simply
+// kEngineLevelDb: fitted so that the engine's sweep on single notes (A2, A3, C4 at velocities
+// 60..127, preset mk8) matches the plugin's. 0.14 octaves rms error at 23 dB, 0.5 at 25.9 dB and
+// 0.7 at 19.7 dB: the plugin's follower does not follow the rms alone.
+constexpr real kEnvLevelOffsetDb = real(23.0);
 constexpr real kEnvAttackSec  = real(0.18);      // level follower, rising: fit to the measured courses
 constexpr real kEnvReleaseSec = real(0.15);      // falling
 
@@ -282,14 +286,13 @@ void Mk8Effects::process(float* outL, float* outR, int numFrames) {
     // compressor as measured on the plugin (PLAN §11): rms detector (9.1 ms) on the mean power
     // of both channels, hard knee, slope = amount (50 % = 2:1, 100 % = limiter), gain smoothed
     // in dB (attack 56 ms, release 11 ms), makeup a plain gain. The plugin's threshold of
-    // -58.7 dBFS; the plugin plays 19.7 dB below the engine output (mk8 with vel.gainDb), so
-    // here -39.0 dBFS.
-    constexpr real thresholdDb = real(-39.0);
+    // -58.7 dBFS, and the engine plays kEngineLevelDb above the plugin: -32.8 dBFS here.
+    const real thresholdDb = real(-58.7) + mk8fx::kEngineLevelDb;
     const real compMakeup = db2lin(makeupDb_);
 
     // drive: on from 1 % (the plugin bypasses it below); input and output gain interpolated
-    // between the fitted settings, shifted by the level offset of 19.7 dB between the plugin
-    // and the engine output so that it saturates at the same point of the dynamics
+    // between the fitted settings, shifted by the level between the plugin and the engine
+    // (kEngineLevelDb) so that it saturates at the same point of the dynamics
     const bool driveOn = drive_ >= real(0.01);
     if (driveOn) {
         static constexpr real kPct[6]  = {1, 10, 25, 50, 75, 100};
@@ -299,7 +302,7 @@ void Mk8Effects::process(float* outL, float* outR, int numFrames) {
         int i = 0;
         while (i < 4 && pct > kPct[i + 1]) ++i;
         const real t = std::clamp<real>((pct - kPct[i]) / (kPct[i + 1] - kPct[i]), 0, 1);
-        constexpr real levelOffsetDb = real(19.7);
+        const real levelOffsetDb = mk8fx::kEngineLevelDb;
         drivePre_ = db2lin(kPre[i] + t * (kPre[i + 1] - kPre[i]) - levelOffsetDb);
         drivePost_ = db2lin(kPost[i] + t * (kPost[i + 1] - kPost[i]) + levelOffsetDb);
     }
@@ -345,7 +348,7 @@ void Mk8Effects::process(float* outL, float* outR, int numFrames) {
         const real envAmp = std::sqrt(envPower_);
         envLevel_ += (envAmp > envLevel_ ? envAttackCoeff_ : envReleaseCoeff_) * (envAmp - envLevel_);
         if (useEnvelope && (envCounter_++ & 7) == 0) {   // centre every 8 samples
-            const real levelDb = lin2dB(envLevel_) - mk8fx::kPluginLevelDb;
+            const real levelDb = lin2dB(envLevel_) - mk8fx::kEnvLevelOffsetDb;
             // loud and high up the sweep would cross the Nyquist frequency, where the biquad is
             // unstable: the centre stays below 0.45 of the sample rate
             const real f = std::min(midStaticHz_ * std::exp2(mk8fx::envelopeOctaves(levelDb, envelope_)),
